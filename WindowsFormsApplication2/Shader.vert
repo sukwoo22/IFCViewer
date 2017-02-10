@@ -3,7 +3,6 @@
 in vec3 inputPosition;
 in vec3 inputNormal;
 
-
 uniform mat4 matView;
 uniform mat4 matProj;
 

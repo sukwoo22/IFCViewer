@@ -66,23 +66,24 @@ namespace WindowsFormsApplication2
 
             // 배경 클리어
             gl.ClearColor(0.4f, 0.4f, 0.4f, 1.0f);
-            //// 쉐이더 프로그램 생성
+            // 쉐이더 프로그램 생성
             var vertexShaderSource = ShaderLoader.LoadShaderFile("Shader.vert");
             var fragmentShaderSource = ShaderLoader.LoadShaderFile("Shader.frag");
             shaderProgram = new ShaderProgram();
             shaderProgram.Create(gl, vertexShaderSource, fragmentShaderSource, null);
             shaderProgram.BindAttributeLocation(gl, attributeIndexPosition, "inputPosition");
-            shaderProgram.BindAttributeLocation(gl, attributeIndexNormal, "inputNormal");
+            //shaderProgram.BindAttributeLocation(gl, attributeIndexNormal, "inputColor");
+
             shaderProgram.AssertValid(gl);
             
             // 원근 투영 매트릭스 생성
             rads = 0.25f * (float)Math.PI;
-            matProj = glm.perspective(rads, w / h, 1.0f, 10000.0f);
+            matProj =camera.Perspective(rads, w / h, 1.0f, 10000.0f);
             width = w;
             height = h;
 
             // 시야 행렬 생성
-            matView = camera.LookAt(new vec3(0.0f, -4.0f, 0.0f), new vec3(0.0f, 0.0f, 0.0f), new vec3(0.0f, 0.0f, 1.0f));
+            matView = camera.LookAt(new vec3(0.0f, 0.0f, -5.0f), new vec3(0.0f, 0.0f, 0.0f), new vec3(0.0f, 1.0f, 0.0f));
 
             testCreateBuffer(gl);
 
@@ -90,24 +91,30 @@ namespace WindowsFormsApplication2
 
         public void testCreateBuffer(OpenGL gl)
         {
-            float[] tVertex = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f };
-            ushort[] tIndex = { 0, 1, 2 };
+            // 버텍스 배열
+            float[] vertices = { 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+            // 인덱스 배열
+            ushort[] indices = {0, 1, 2};
+
+
+            // 버텍스 버퍼 배열 객체 생성
             ifcParser.vertexBufferArray = new VertexBufferArray();
             ifcParser.vertexBufferArray.Create(gl);
             ifcParser.vertexBufferArray.Bind(gl);
 
-            ifcParser.vertexBuffer = new VertexBuffer();
-            ifcParser.vertexBuffer.Create(gl);
-            ifcParser.vertexBuffer.Bind(gl);
-            ifcParser.vertexBuffer.SetData(gl, 0, tVertex, false, 3);
+            //  버텍스 버퍼 생성
+            var vertexDataBuffer = new VertexBuffer();
+            vertexDataBuffer.Create(gl);
+            vertexDataBuffer.Bind(gl);
+            vertexDataBuffer.SetData(gl, 0, vertices, false, 3);
 
-            ifcParser.indexBuffer = new IndexBuffer();
-            ifcParser.indexBuffer.Create(gl);
-            ifcParser.indexBuffer.Bind(gl);
-            ifcParser.indexBuffer.SetData(gl, tIndex);
+            // 인덱스 버퍼 생성
+            var indexDataBuffer = new IndexBuffer();
+            indexDataBuffer.Create(gl);
+            indexDataBuffer.Bind(gl);
+            indexDataBuffer.SetData(gl, indices);
 
             ifcParser.vertexBufferArray.Unbind(gl);
-
         }
 
         public void InitDeviceBuffer(OpenGL gl, float width, float height)
@@ -205,11 +212,7 @@ namespace WindowsFormsApplication2
 
             ifcParser.vertexBufferArray.Unbind(gl);
 
-            gl.Enable(OpenGL.GL_CULL_FACE);
-            gl.FrontFace(OpenGL.GL_CW);
-
-            gl.Enable(OpenGL.GL_DEPTH_TEST);
-            gl.DepthFunc(OpenGL.GL_LEQUAL);
+         
 
         }
 
@@ -263,13 +266,17 @@ namespace WindowsFormsApplication2
             }
         }
 
-        public void CreateBuffer(OpenGL gl)
+        double degrees = 0;
+        public void Update()
         {
-            gl.Enable(OpenGL.GL_CULL_FACE);
-            gl.FrontFace(OpenGL.GL_CW);
 
-            gl.Enable(OpenGL.GL_DEPTH_TEST);
-            gl.DepthFunc(OpenGL.GL_LEQUAL);
+            double angle = Math.PI * degrees / 180.0;
+
+            float x = -5.0f * (float)Math.Sin(angle);
+            float y = -5.0f * (float)Math.Cos(angle);
+
+            matView = camera.LookAt(new vec3(x, 0.0f, y ), new vec3(0.0f, 0.0f, 0.0f), new vec3(0.0f, 1.0f, 0.0f));
+            ++degrees;       
         }
 
         public void Render(OpenGL gl)
@@ -281,21 +288,21 @@ namespace WindowsFormsApplication2
             shaderProgram.SetUniformMatrix4(gl, "matProj", matProj.to_array());
             shaderProgram.SetUniformMatrix4(gl, "matView", matView.to_array());
 
+            ifcParser.vertexBufferArray.Bind(gl);
             //if(ifcParser.ifcItemList.Count != 0)
             //{
             //    ifcParser.vertexBufferArray.Bind(gl);
-
+            
             //    gl.DrawElements(OpenGL.GL_TRIANGLES, indexCount, OpenGL.GL_UNSIGNED_SHORT, IntPtr.Zero);
-
+            
             //    ifcParser.vertexBufferArray.Unbind(gl);
             //}
-            gl.DrawArrays(OpenGL.GL_TRIANGLES, 0, 3);
 
+            gl.DrawElements(OpenGL.GL_TRIANGLES, 3, OpenGL.GL_UNSIGNED_SHORT, IntPtr.Zero);
+
+            ifcParser.vertexBufferArray.Unbind(gl);
             shaderProgram.Unbind(gl);
 
-//          gl.ClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-
-            
            
         }
     }

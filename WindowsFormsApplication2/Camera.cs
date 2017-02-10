@@ -42,12 +42,12 @@ namespace WindowsFormsApplication2
         // 전체 모델의 최대 위치
         vec3 pMax;
 
-        void calculateCameraDistance(vec3 posMax, vec3 posMin)
+        private void calculateCameraDistance(vec3 posMax, vec3 posMin)
         {
             cameraDistance = 0.33334f * (posMax.x - posMin.x + posMax.y - posMin.y + posMax.z - posMax.z);
         }
 
-        void updateCoef(ref vec3 center)
+        private void updateCoef(ref vec3 center)
         {
             vec3 temp = center - pEye;
 
@@ -89,12 +89,12 @@ namespace WindowsFormsApplication2
         }
 
 
-        float vec3Dot(vec3 a, vec3 b)
+        private float vec3Dot(vec3 a, vec3 b)
         {
             return a.x * b.x + a.y * b.y + a.z * b.z;
         }
 
-        void vec3TransformNormal(ref vec3 vec, ref mat4 m)
+        private void vec3TransformNormal(ref vec3 vec, ref mat4 m)
         {
             vec3 temp = new vec3(m[0, 0] * vec.x + m[1, 0] * vec.y + m[2, 0] * vec.z,
                                  m[0, 1] * vec.x + m[1, 1] * vec.y + m[2, 1] * vec.z,
@@ -114,7 +114,7 @@ namespace WindowsFormsApplication2
         //    return glm.normalize(temp);
         //}
 
-        void vec3TransformCoord(ref vec3 pos, ref mat4 m)
+        private void vec3TransformCoord(ref vec3 pos, ref mat4 m)
         {
             vec3 temp = new vec3(m[0, 0] * pos.x + m[1, 0] * pos.y + m[2, 0] * pos.z + m[3, 0] * 1.0f,
                                 m[0, 1] * pos.x + m[1, 1] * pos.y + m[2, 1] * pos.z + m[3, 1] * 1.0f,
@@ -136,15 +136,16 @@ namespace WindowsFormsApplication2
             eye = new vec3(-vec3Dot(vSide, eye), -vec3Dot(vUp, eye), -vec3Dot(vLook, eye));
 
             vec4[] temp = new vec4[4];
-            temp[0] = new vec4(vSide[0], vUp[0], vLook[0], 0.0f);
-            temp[1] = new vec4(vSide[1], vUp[1], vLook[1], 0.0f);
-            temp[2] = new vec4(vSide[2], vUp[2], vLook[2], 0.0f);
+            temp[0] = new vec4(vSide.x, vUp.x, vLook[0], 0.0f);
+            temp[1] = new vec4(vSide.y, vUp.y, vLook[1], 0.0f);
+            temp[2] = new vec4(vSide.z, vUp.z, vLook[2], 0.0f);
             temp[3] = new vec4(pEye.x, pEye.y, pEye.z, 1.0f);
 
             matView = new mat4(temp);
 
             return matView;
         }
+
 
         // 원근 투영 행렬 생성
         public mat4 Perspective(float fovY, float aspect, float n, float f)
@@ -192,6 +193,7 @@ namespace WindowsFormsApplication2
             mat4 m = new mat4(temp);
 
             matView = m;
+
         }
 
 

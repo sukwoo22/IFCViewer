@@ -15,17 +15,16 @@ namespace WindowsFormsApplication2
     {
         Scene scene = null;
 
-        //IFCViewerWrapper ifcParser = null;
-
         public Form1()
         {
             InitializeComponent();
 
-            //ifcParser = new IFCViewerWrapper();
         }
 
         private void openGLControl1_OpenGLDraw(object sender, SharpGL.RenderEventArgs args)
         {
+            scene.Update();
+
             scene.Render(openGLControl1.OpenGL);
         }
 
