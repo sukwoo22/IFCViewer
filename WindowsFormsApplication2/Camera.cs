@@ -139,7 +139,7 @@ namespace WindowsFormsApplication2
             temp[0] = new vec4(vSide.x, vUp.x, vLook[0], 0.0f);
             temp[1] = new vec4(vSide.y, vUp.y, vLook[1], 0.0f);
             temp[2] = new vec4(vSide.z, vUp.z, vLook[2], 0.0f);
-            temp[3] = new vec4(pEye.x, pEye.y, pEye.z, 1.0f);
+            temp[3] = new vec4(eye.x, eye.y, eye.z, 1.0f);
 
             matView = new mat4(temp);
 

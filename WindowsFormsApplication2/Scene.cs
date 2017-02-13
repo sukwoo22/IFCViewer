@@ -72,7 +72,7 @@ namespace WindowsFormsApplication2
             shaderProgram = new ShaderProgram();
             shaderProgram.Create(gl, vertexShaderSource, fragmentShaderSource, null);
             shaderProgram.BindAttributeLocation(gl, attributeIndexPosition, "inputPosition");
-            //shaderProgram.BindAttributeLocation(gl, attributeIndexNormal, "inputColor");
+            shaderProgram.BindAttributeLocation(gl, attributeIndexNormal, "inputNormal");
 
             shaderProgram.AssertValid(gl);
             
@@ -92,9 +92,17 @@ namespace WindowsFormsApplication2
         public void testCreateBuffer(OpenGL gl)
         {
             // 버텍스 배열
-            float[] vertices = { 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+            float[] vertices = {
+                                   0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+                                   1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+                                   1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+                                   0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f
+                               };
             // 인덱스 배열
-            ushort[] indices = {0, 1, 2};
+            int[] indices = {
+                                   0, 1, 2,
+                                   2, 3, 0,
+                               };
 
 
             // 버텍스 버퍼 배열 객체 생성
@@ -106,15 +114,21 @@ namespace WindowsFormsApplication2
             var vertexDataBuffer = new VertexBuffer();
             vertexDataBuffer.Create(gl);
             vertexDataBuffer.Bind(gl);
-            vertexDataBuffer.SetData(gl, 0, vertices, false, 3);
+            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, vertices, OpenGL.GL_STATIC_DRAW);
+            gl.VertexAttribPointer(attributeIndexPosition, 3, OpenGL.GL_FLOAT, false, sizeof(float) * 6, IntPtr.Zero);
+            gl.EnableVertexAttribArray(0);
+            gl.VertexAttribPointer(attributeIndexNormal, 3, OpenGL.GL_FLOAT, false, sizeof(float) * 6, IntPtr.Zero);
+            gl.EnableVertexAttribArray(1);
 
             // 인덱스 버퍼 생성
             var indexDataBuffer = new IndexBuffer();
             indexDataBuffer.Create(gl);
             indexDataBuffer.Bind(gl);
-            indexDataBuffer.SetData(gl, indices);
+            IntPtr ptr = GCHandle.Alloc(indices, GCHandleType.Pinned).AddrOfPinnedObject();
+            gl.BufferData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, indices.Length * sizeof(int), ptr, OpenGL.GL_STATIC_DRAW);
 
             ifcParser.vertexBufferArray.Unbind(gl);
+
         }
 
         public void InitDeviceBuffer(OpenGL gl, float width, float height)
@@ -153,8 +167,8 @@ namespace WindowsFormsApplication2
 
             // 카메라의 최종 초점 거리
             float cameraDistance = Dx > Dy ? Dx : Dy;
-            
-            matView = camera.LookAt(new vec3(center.x, center.y - cameraDistance, center.z), center, new vec3(0.0f, 0.0f, 1.0f));
+
+            matView = camera.LookAt(new vec3(center.x, center.y, center.z - cameraDistance), center, new vec3(0.0f, 1.0f, 0.0f));
 
             Int64 vBuffSize = 0, iBuffSize = 0;
 
@@ -188,32 +202,33 @@ namespace WindowsFormsApplication2
                 gl.BufferSubData(OpenGL.GL_ARRAY_BUFFER, vSize, sizeof(float) * (int)ifcParser.ifcItemList[i].noVerticesForFaces, vertexPointer);
 
                 vSize += sizeof(float) * (int)ifcParser.ifcItemList[i].noVerticesForFaces;
-                pinnedVertexArray.Free();
+                //pinnedVertexArray.Free();
             }
 
-            gl.VertexAttribPointer(0, 6, OpenGL.GL_FLOAT, false, 0, IntPtr.Zero);
+            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, sizeof(float) * 6, IntPtr.Zero);
+            gl.EnableVertexAttribArray(0);
+            gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, sizeof(float) * 6, IntPtr.Zero);
             gl.EnableVertexAttribArray(0);
 
             ifcParser.indexBuffer.Create(gl);
             ifcParser.indexBuffer.Bind(gl);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, sizeof(int) * (int)iBuffSize, IntPtr.Zero, OpenGL.GL_STATIC_DRAW);
+            gl.BufferData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, sizeof(int) * (int)iBuffSize, IntPtr.Zero, OpenGL.GL_STATIC_DRAW);
 
             // 모든 객체의 인덱스 집합을 한 버퍼에 집어 넣는다.
             for (var i = 0; i < ifcParser.ifcItemList.Count; ++i)
             {
                 GCHandle pinnedIndexArray = GCHandle.Alloc(ifcParser.ifcItemList[i].indicesForFaces, GCHandleType.Pinned);
                 IntPtr indexPointer = pinnedIndexArray.AddrOfPinnedObject();
-                gl.BufferSubData(OpenGL.GL_ARRAY_BUFFER, iSize, sizeof(int) * (int)ifcParser.ifcItemList[i].noPrimitivesForFaces, indexPointer);
+                gl.BufferSubData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, iSize, sizeof(int) * (int)ifcParser.ifcItemList[i].noPrimitivesForFaces, indexPointer);
 
                 iSize += sizeof(int) * (int)ifcParser.ifcItemList[i].noPrimitivesForFaces;
-                pinnedIndexArray.Free();
+                //pinnedIndexArray.Free();
             }
-
 
             ifcParser.vertexBufferArray.Unbind(gl);
 
          
-
+            
         }
 
         private void GetDimensions(ref GlmNet.vec3 min, ref GlmNet.vec3 max, ref bool initMinMax)
@@ -275,32 +290,35 @@ namespace WindowsFormsApplication2
             float x = -5.0f * (float)Math.Sin(angle);
             float y = -5.0f * (float)Math.Cos(angle);
 
-            matView = camera.LookAt(new vec3(x, 0.0f, y ), new vec3(0.0f, 0.0f, 0.0f), new vec3(0.0f, 1.0f, 0.0f));
+            //matView = camera.LookAt(new vec3(x, 0.0f, y ), new vec3(0.0f, 0.0f, 0.0f), new vec3(0.0f, 1.0f, 0.0f));
             ++degrees;       
         }
 
         public void Render(OpenGL gl)
         {
             // 장면 클리어
-            gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT | OpenGL.GL_STENCIL_BUFFER_BIT);
+            gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
 
             shaderProgram.Bind(gl);
             shaderProgram.SetUniformMatrix4(gl, "matProj", matProj.to_array());
             shaderProgram.SetUniformMatrix4(gl, "matView", matView.to_array());
 
-            ifcParser.vertexBufferArray.Bind(gl);
-            //if(ifcParser.ifcItemList.Count != 0)
+            
+            //if (ifcParser.ifcItemList.Count != 0)
             //{
             //    ifcParser.vertexBufferArray.Bind(gl);
-            
+
             //    gl.DrawElements(OpenGL.GL_TRIANGLES, indexCount, OpenGL.GL_UNSIGNED_SHORT, IntPtr.Zero);
-            
+
             //    ifcParser.vertexBufferArray.Unbind(gl);
             //}
 
-            gl.DrawElements(OpenGL.GL_TRIANGLES, 3, OpenGL.GL_UNSIGNED_SHORT, IntPtr.Zero);
+            ifcParser.vertexBufferArray.Bind(gl);
+
+            gl.DrawElements(OpenGL.GL_TRIANGLES, 6, OpenGL.GL_UNSIGNED_INT, IntPtr.Zero);
 
             ifcParser.vertexBufferArray.Unbind(gl);
+
             shaderProgram.Unbind(gl);
 
            
