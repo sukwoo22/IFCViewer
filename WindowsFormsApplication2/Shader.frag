@@ -1,6 +1,7 @@
 ﻿#version 430 core
-int vec3 passColor;
 out vec4 outputColor;
+
+in vec3 passColor;
 
 void main(void)
 {

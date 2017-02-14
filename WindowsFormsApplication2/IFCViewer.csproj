@@ -91,7 +91,13 @@
     <Reference Include="SharpGL.WinForms">
       <HintPath>D:\이석우 백업\업무\SharpGL\YT.SGL.Viewer\YT.SGL.TEST_SW\SharpGL DLL\SharpGL.WinForms.dll</HintPath>
     </Reference>
-    <Reference Include="System" />
+    <Reference Include="SharpGLSub">
+      <HintPath>D:\이석우 백업\연구\SharpGl\SharpGL-master\SharpGL\bin\Debug\SharpGLSub.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System">
+      <Private>False</Private>
+    </Reference>
     <Reference Include="System.Core" />
     <Reference Include="System.Design" />
     <Reference Include="System.Drawing.Design" />

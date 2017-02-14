@@ -55,7 +55,7 @@ namespace WindowsFormsApplication2
         private void 파일초기화ToolStripMenuItem_Click(object sender, EventArgs e)
         {
 
-
+            scene.ClearScene();
         }
     }
 }
