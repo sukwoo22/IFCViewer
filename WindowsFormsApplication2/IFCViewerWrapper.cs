@@ -142,10 +142,9 @@ namespace IFCViewer
         private Control _destControl = null;
         private TreeView _treeControl = null;
         public List<IFCItem> ifcItemList = new List<IFCItem>();
-        public VertexBufferArray vertexBufferArray = null;
-        public VertexBuffer vertexBuffer = null;
-        public IndexBuffer indexBuffer = null;
-
+        public VertexBufferArray vertexBufferArray = new VertexBufferArray();
+        public VertexBuffer vertexBuffer = new VertexBuffer();
+        public IndexBuffer indexBuffer = new IndexBuffer();
 
         private static IFCViewerWrapper instance = new IFCViewerWrapper();
 
@@ -159,20 +158,7 @@ namespace IFCViewer
             }
         }
 
-
-
-        struct CUSTOMVERTEX
-        {
-            float x;
-            float y;
-            float z;
-            float nx;
-            float ny;
-            float nz;
-        }
-
-
-        public WindowsFormsApplication2.Camera camera = WindowsFormsApplication2.Camera.Instance;
+        public Camera camera = Camera.Instance;
 
         public bool ParseIfcFile(string sPath)
         {
@@ -453,172 +439,6 @@ namespace IFCViewer
         {
             _destControl = destControl;
             _treeControl = destTreeControl;
-        }
-
-
-        public void InitDeviceBuffer(OpenGL gl, float width, float height)
-        {
-            GlmNet.vec3 min = new GlmNet.vec3();
-            GlmNet.vec3 max = new GlmNet.vec3();
-
-            bool initMinMax = false;
-            GetDimensions(ref min, ref max, ref initMinMax);
-
-            GlmNet.vec3 center = new GlmNet.vec3();
-            center.x = (max.x + min.x) / 2f;
-            center.y = (max.y + min.y) / 2f;
-            center.z = (max.z + min.z) / 2f;
-
-            float size = max.x - min.x;
-
-            if (size < max.y - min.y) size = max.y - min.y;
-            if (size < max.z - min.z) size = max.z - min.z;
-
-            float thetaY = 0.25f * (float)Math.PI;
-            float thetaX = 2.0f  * (float)Math.Atan(width/height * (float)Math.Tan((double)thetaY*0.5));
-
-            // 정면부와 후면부에서 바라볼 때 x좌표를 기준으로 초점 거리를 구한다. 
-            float Dx1 = camera.CalculateDistance(center.x, max.x, min.x, thetaX);
-            // 측면부에서 바라볼 때 x좌표를 기준으로 초점거리를 구한다.
-            float Dx2 = camera.CalculateDistance(center.z, max.z, min.z, thetaX);
-            // 정면부와 후면부에서 바라볼 때 z좌표를 기준으로 초점거리를 구한다.
-            float Dy1 = camera.CalculateDistance(center.z, max.z, min.z, thetaY);
-            // 윗면부에서 바라볼 때 y좌표를 기준으로 초점거리를 구한다. 
-            float Dy2 = camera.CalculateDistance(center.y, max.y, min.y, thetaY);
-            
-            // 가장 큰 거리를 구한다.
-            float Dx = Dx1 > Dx2 ? Dx1 : Dx2;
-            float Dy = Dy1 > Dy2 ? Dy1 : Dy2;
-
-            // 카메라의 최종 초점 거리
-            float cameraDistance = Dx > Dy ? Dx : Dy;
-
-            camera.LookAt(new GlmNet.vec3(center.x, center.y - cameraDistance, center.z), center, new GlmNet.vec3(0.0f, 0.0f, 1.0f));
-
-            Int64 vBuffSize = 0, iBuffSize = 0;
-
-            GetFaceBufferSize(ref vBuffSize, ref iBuffSize);
-            //GetWireFrameBufferSize(ref vBuffSize, ref iBuffSize);
-
-            // 버텍스 구조체 사이즈
-            int sSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(CUSTOMVERTEX));
-
-            if (vBuffSize == 0)
-                return;
-
-            vertexBuffer = new VertexBuffer();
-            indexBuffer = new IndexBuffer();
-            vertexBufferArray = new VertexBufferArray();
-
-            
-            int vSize = 0;
-            int iSize = 0;
-            vertexBufferArray.Create(gl);
-            vertexBufferArray.Bind(gl);
-
-            vertexBuffer.Create(gl);
-            vertexBuffer.Bind(gl);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, sizeof(float) * (int)vBuffSize, IntPtr.Zero, OpenGL.GL_STATIC_DRAW);
-
-            // 모든 객체의 버텍스 집합을 한 버퍼에 집어 넣는다.
-            for(var i = 0; i < ifcItemList.Count ; ++i)
-            {
-                GCHandle pinnedVertexArray = GCHandle.Alloc(ifcItemList[i].verticesForFaces, GCHandleType.Pinned);
-                IntPtr vertexPointer = pinnedVertexArray.AddrOfPinnedObject();
-                gl.BufferSubData(OpenGL.GL_ARRAY_BUFFER, vSize, sizeof(float) * (int)ifcItemList[i].noVerticesForFaces, vertexPointer);
-
-                vSize += sizeof(float) * (int)ifcItemList[i].noVerticesForFaces;
-                pinnedVertexArray.Free();
-            }
-
-            gl.VertexAttribPointer(0, 6, OpenGL.GL_FLOAT, false, 0, IntPtr.Zero);
-            gl.EnableVertexAttribArray(0);
-
-            indexBuffer.Create(gl);
-            indexBuffer.Bind(gl);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, sizeof(int) * (int)iBuffSize, IntPtr.Zero, OpenGL.GL_STATIC_DRAW);
-           
-            // 모든 객체의 인덱스 집합을 한 버퍼에 집어 넣는다.
-            for (var i = 0; i < ifcItemList.Count; ++i)
-            {
-                GCHandle pinnedIndexArray = GCHandle.Alloc(ifcItemList[i].indicesForFaces, GCHandleType.Pinned);
-                IntPtr indexPointer = pinnedIndexArray.AddrOfPinnedObject();
-                gl.BufferSubData(OpenGL.GL_ARRAY_BUFFER, iSize, sizeof(int) * (int)ifcItemList[i].noPrimitivesForFaces, indexPointer);
-
-                iSize += sizeof(int) * (int)ifcItemList[i].noPrimitivesForFaces;
-                pinnedIndexArray.Free();
-            }
-
-            gl.VertexAttribPointer(1, 3, OpenGL.GL_INT, false, 0, IntPtr.Zero);
-            gl.EnableVertexAttribArray(1);
-
-            vertexBufferArray.Unbind(gl);
-
-        }
-
-        private void GetDimensions(ref GlmNet.vec3 min, ref GlmNet.vec3 max, ref bool initMinMax)
-        {
-            for(var i = 0; i < ifcItemList.Count; ++i)
-            {
-                if(ifcItemList[i].noVerticesForFaces !=0)
-                {
-                    if(initMinMax == false)
-                    {
-                        min.x = ifcItemList[i].verticesForFaces[3 * 0 + 0];
-                        min.y = ifcItemList[i].verticesForFaces[3 * 0 + 1];
-                        min.z = ifcItemList[i].verticesForFaces[3 * 0 + 2];
-                        max = min;
-
-                        initMinMax = true;
-                    }
-                    
-                    
-
-                    Int64 j = 0;
-                    while(j < ifcItemList[i].noVerticesForFaces)
-                    {
-                        min.x = Math.Min(min.x, ifcItemList[i].verticesForFaces[6 * j + 0]);
-                        min.y = Math.Min(min.y, ifcItemList[i].verticesForFaces[6 * j + 1]);
-                        min.z = Math.Min(min.z, ifcItemList[i].verticesForFaces[6 * j + 2]);
-
-                        max.x = Math.Max(max.x, ifcItemList[i].verticesForFaces[6 * j + 0]);
-                        max.y = Math.Max(max.y, ifcItemList[i].verticesForFaces[6 * j + 1]);
-                        max.z = Math.Max(max.z, ifcItemList[i].verticesForFaces[6 * j + 2]);
-
-                        ++j;
-                    }
-                }
-            }
-        }
-
-        private void GetFaceBufferSize(ref Int64 vBuffSize, ref Int64 iBuffSize)
-        {
-            for(var i =0; i < ifcItemList.Count; ++i)
-            {
-                if(ifcItemList[i].ifcID != 0 && ifcItemList[i].noVerticesForFaces !=0 && ifcItemList[i].noPrimitivesForFaces !=0)
-                {
-                    ifcItemList[i].vertexOffsetForFaces = vBuffSize;
-                    ifcItemList[i].indexOffsetForFaces = iBuffSize;
-
-                    vBuffSize += ifcItemList[i].noVerticesForFaces;
-                    iBuffSize += 3 * ifcItemList[i].noPrimitivesForFaces;
-                }
-            }
-        }
-
-        private void GetWireFrameBufferSize(ref Int64 vBuffSize, ref Int64 iBuffSize)
-        {
-            for(var i =0; i < ifcItemList.Count; ++i)
-            {
-                if(ifcItemList[i].ifcID != 0 && ifcItemList[i].noVerticesForWireFrame !=0 && ifcItemList[i].noPrimitivesForWireFrame !=0)
-                {
-                    ifcItemList[i].vertexOffsetForWireFrame = vBuffSize;
-                    ifcItemList[i].indexOffsetForWireFrame = iBuffSize;
-
-                    vBuffSize += ifcItemList[i].noVerticesForWireFrame;
-                    iBuffSize += 2 * ifcItemList[i].noPrimitivesForWireFrame;
-                }
-            }
         }
 
 

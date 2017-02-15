@@ -5,42 +5,42 @@ using System.Text;
 using System.Threading.Tasks;
 using GlmNet;
 
-namespace WindowsFormsApplication2
+namespace IFCViewer
 {
     class Camera
     {
         // 카메라 위치
-        vec3 pEye;
+        private vec3 pEye;
 
         // 카메라 up 벡터
-        vec3 vUp;
+        private vec3 vUp;
 
         // 카메라 side 벡터
-        vec3 vSide;
+        private vec3 vSide;
 
         // 카메라 look 벡터
-        vec3 vLook;
+        private vec3 vLook;
 
         // 시야 행렬
-        mat4 matView;
+        private mat4 matView;
 
         // 투영 행렬
-        mat4 matProj;
+        private mat4 matProj;
 
         // 카메라 위치와 바라보는 위치 사이의 거리
-        float cameraDistance = 1.0f;
+        private float cameraDistance = 1.0f;
        
         // 이동 계수
-        float moveCoef = 1.0f;
+        private float moveCoef = 1.0f;
 
         // 모델 중심점
-        vec3 pCenter;
+        private vec3 pCenter;
 
         // 전체 모델의 최소 위치
-        vec3 pMin;
+        private vec3 pMin;
 
         // 전체 모델의 최대 위치
-        vec3 pMax;
+        private vec3 pMax;
 
         private void calculateCameraDistance(vec3 posMax, vec3 posMin)
         {

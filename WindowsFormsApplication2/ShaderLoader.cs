@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Reflection;
 
-namespace WindowsFormsApplication2
+namespace IFCViewer
 {
     public static class ShaderLoader
     {

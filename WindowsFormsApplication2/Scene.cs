@@ -8,9 +8,8 @@ using GlmNet;
 using SharpGL;
 using SharpGL.Shaders;
 using SharpGL.VertexBuffers;
-using IFCViewer;
 
-namespace WindowsFormsApplication2
+namespace IFCViewer
 {
     public class Scene
     {
@@ -62,16 +61,20 @@ namespace WindowsFormsApplication2
            }
         }
 
-        public void ClearScene()
+        public void ClearScene(OpenGL gl)
         {
             modelList.Clear();
             ifcParser.ClearMemory();
+            ifcParser.vertexBuffer.Unbind(gl);
+            ifcParser.indexBuffer.Unbind(gl);
+            ifcParser.vertexBufferArray.Unbind(gl);
+
         }
 
         public void ParseIFCFile(string sPath)
         {
+            modelList.Clear();           
             ifcParser.ParseIfcFile(sPath);
-
             AddModel();
         }
 
@@ -92,14 +95,20 @@ namespace WindowsFormsApplication2
             
             // 원근 투영 매트릭스 생성
             rads = 0.25f * (float)Math.PI;
-            matProj =camera.Perspective(rads, w / h, 1.0f, 100000.0f);
+            matProj =camera.Perspective(rads, w / h, 1.0f, 1000000.0f);
             width = w;
             height = h;
+
 
             // 시야 행렬 생성
             matView = camera.LookAt(new vec3(0.0f, 5.0f, 0.0f), new vec3(0.0f, 0.0f, 0.0f), new vec3(0.0f, 0.0f, 1.0f));
 
             //testCreateBuffer(gl);
+            ifcParser.vertexBufferArray.Create(gl);
+            ifcParser.vertexBuffer.Create(gl);
+            ifcParser.indexBuffer.Create(gl);
+            SetupLights(gl);
+            
 
         }
 
@@ -178,13 +187,13 @@ namespace WindowsFormsApplication2
         public void InitDeviceBuffer(OpenGL gl, float width, float height)
         {
             #region 초점 거리 계산
-            GlmNet.vec3 min = new GlmNet.vec3();
-            GlmNet.vec3 max = new GlmNet.vec3();
+            vec3 min = new vec3();
+            vec3 max = new vec3();
 
             bool initMinMax = false;
             GetDimensions(ref min, ref max, ref initMinMax);
 
-            GlmNet.vec3 center = new GlmNet.vec3();
+            vec3 center = new vec3();
             center.x = (max.x + min.x) / 2f;
             center.y = (max.y + min.y) / 2f;
             center.z = (max.z + min.z) / 2f;
@@ -212,8 +221,18 @@ namespace WindowsFormsApplication2
 
             // 카메라의 최종 초점 거리
             float cameraDistance = Dx > Dy ? Dx : Dy;
+            cameraDistance *= 1.5f;
 
-            matView = camera.LookAt(new vec3(center.x, center.y - 1.5f * cameraDistance, center.z), center, new vec3(0.0f, 0.0f, 1.0f));
+            matView = camera.LookAt(new vec3(center.x, center.y - cameraDistance, center.z), center, new vec3(0.0f, 0.0f, 1.0f));
+            
+            // 프러스텀의 최대 깊이를 구한다.
+            float maxZ = 1.0f;
+            while(cameraDistance * 2.0f > maxZ)
+            {
+                maxZ *= 10.0f;
+            }
+
+            matProj = camera.Perspective(0.25f * (float)Math.PI, width / height, 1.0f, maxZ);
             #endregion
 
             Int64 vBuffSize = 0, iBuffSize = 0;
@@ -226,17 +245,10 @@ namespace WindowsFormsApplication2
             if (vBuffSize == 0)
                 return;
 
-            ifcParser.vertexBuffer = new VertexBuffer();
-            ifcParser.indexBuffer = new IndexBuffer();
-            ifcParser.vertexBufferArray = new VertexBufferArray();
-
-
             int vSize = 0;
             int iSize = 0;
-            ifcParser.vertexBufferArray.Create(gl);
             ifcParser.vertexBufferArray.Bind(gl);
 
-            ifcParser.vertexBuffer.Create(gl);
             ifcParser.vertexBuffer.Bind(gl);
             gl.BufferData(OpenGL.GL_ARRAY_BUFFER, sizeof(float) * (int)vBuffSize * 6, IntPtr.Zero, OpenGL.GL_STATIC_DRAW);
 
@@ -252,10 +264,9 @@ namespace WindowsFormsApplication2
 
             gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, sizeof(float) * 6, IntPtr.Zero);
             gl.EnableVertexAttribArray(attributeIndexPosition);
-            gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, sizeof(float) * 6, IntPtr.Add(IntPtr.Zero, sizeof(float)*3));
+            gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, sizeof(float) * 6, IntPtr.Add(IntPtr.Zero, sizeof(float) * 3));
             gl.EnableVertexAttribArray(attributeIndexNormal);
 
-            ifcParser.indexBuffer.Create(gl);
             ifcParser.indexBuffer.Bind(gl);
             gl.BufferData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, sizeof(int) * (int)iBuffSize, IntPtr.Zero, OpenGL.GL_STATIC_DRAW);
 
@@ -270,8 +281,6 @@ namespace WindowsFormsApplication2
             }
 
             ifcParser.vertexBufferArray.Unbind(gl);
-
-         
             
         }
 
@@ -334,6 +343,53 @@ namespace WindowsFormsApplication2
             }
         }
 
+        struct LIGHT
+        {
+            public vec4 diffuse;
+            public vec4 specular;
+            public vec4 ambient;
+            public vec3 position;
+            public vec3 direction;
+            public float range;
+        }
+
+        LIGHT light1 = new LIGHT();
+        LIGHT light2 = new LIGHT();
+        LIGHT light3 = new LIGHT();
+
+        private void SetupLights(OpenGL gl)
+        {
+
+           
+            light1.diffuse  = new vec4(0.1f, 0.1f, 0.1f, 0.1f);
+            light1.specular = new vec4(0.3f, 0.3f, 0.3f, 0.1f);
+            light1.ambient  = new vec4(0.7f, 0.7f, 0.7f, 0.1f);
+            light1.position = new vec3(2.0f, 2.0f, 0.0f);
+            vec3 vecDir = new vec3(-3.0f, -6.0f, -2.0f);
+            light1.direction = glm.normalize(vecDir);
+            light1.range = 10.0f;
+
+            
+            light2.diffuse  = new vec4(0.2f, 0.2f, 0.2f, 1.0f);
+            light2.specular = new vec4(0.2f, 0.2f, 0.2f, 1.0f);
+            light2.ambient  = new vec4(0.2f, 0.2f, 0.2f, 1.0f);
+            light2.position = new vec3(-1.0f, -1.0f, -0.5f);
+            vec3 vecDir2    = new vec3(1.0f, 1.0f, 0.5f);
+            light2.direction = glm.normalize(vecDir);
+            light2.range = 2.0f;
+
+            
+            light3.diffuse  = new vec4(0.2f, 0.2f, 0.2f, 1.0f);
+            light3.specular = new vec4(0.2f, 0.2f, 0.2f, 1.0f);
+            light3.ambient  = new vec4(0.2f, 0.2f, 0.2f, 1.0f);
+            light3.position = new vec3(1.0f, 1.0f, 0.5f);
+            vec3 vecDir3    = new vec3(-1.0f, -1.0f, -0.5f);
+            light3.direction = glm.normalize(vecDir);
+            light3.range = 2.0f;
+
+            
+        }
+
 
         public void Update()
         {
@@ -348,14 +404,19 @@ namespace WindowsFormsApplication2
             shaderProgram.Bind(gl);
             shaderProgram.SetUniformMatrix4(gl, "matProj", matProj.to_array());
             shaderProgram.SetUniformMatrix4(gl, "matView", matView.to_array());
+            shaderProgram.SetUniform3(gl, "diffuseAlbedo",  light1.diffuse.x, light1.diffuse.y, light1.diffuse.z);
+            shaderProgram.SetUniform3(gl, "specularAlbedo", light1.specular.x, light1.specular.y, light1.specular.z);
+            shaderProgram.SetUniform3(gl, "lightDir",       light1.direction.x, light1.direction.y, light1.direction.z);
+            shaderProgram.SetUniform1(gl, "specularPower",  0.5f);
+            
 
             if (modelList.Count != 0)
             {
                 ifcParser.vertexBufferArray.Bind(gl);
 
-                for (var i = 0; i < modelList.Count; ++ i)
+                for (var i = 0; i < modelList.Count; ++i)
                 {
-                    gl.DrawElements(OpenGL.GL_TRIANGLES, 3 * (int)modelList[i].noPrimitivesForFaces, OpenGL.GL_UNSIGNED_INT, IntPtr.Add(IntPtr.Zero, sizeof(int) * (int)modelList[i].indexOffsetForFaces));                    
+                    gl.DrawElements(OpenGL.GL_TRIANGLES, 3 * (int)modelList[i].noPrimitivesForFaces, OpenGL.GL_UNSIGNED_INT, IntPtr.Add(IntPtr.Zero, sizeof(int) * (int)modelList[i].indexOffsetForFaces));
                 }
 
                 ifcParser.vertexBufferArray.Unbind(gl);
