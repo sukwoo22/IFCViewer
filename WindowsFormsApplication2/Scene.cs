@@ -35,6 +35,24 @@ namespace IFCViewer
 
         float height = 0.0f;
 
+        float NEARDEPTH = 1.0f;
+        float FARDEPTH = 10000.0f;
+
+        // 조명
+        struct LIGHT
+        {
+            public vec4 diffuse;
+            public vec4 specular;
+            public vec4 ambient;
+            public vec3 position;
+            public vec3 direction;
+            public float range;
+        }
+
+        LIGHT light1 = new LIGHT();
+        LIGHT light2 = new LIGHT();
+        LIGHT light3 = new LIGHT();
+
 
         Camera camera = Camera.Instance;
         IFCViewerWrapper ifcParser = IFCViewerWrapper.Instance;
@@ -50,9 +68,9 @@ namespace IFCViewer
         }
 
 
-        private void AddModel()
+        private void AddModel(int startIndex)
         {
-           for(var i= 0; i < ifcParser.ifcItemList.Count; ++i)
+           for(var i= startIndex; i < ifcParser.ifcItemList.Count; ++i)
            {
                if(ifcParser.ifcItemList[i].noVerticesForFaces > 0)
                {
@@ -71,18 +89,28 @@ namespace IFCViewer
 
         }
 
-        public void ParseIFCFile(string sPath)
+        public void ParseIFCFile(string sPath, OpenGL gl)
         {
             modelList.Clear();           
             ifcParser.ParseIfcFile(sPath);
-            AddModel();
+            AddModel(0);
+            InitDeviceBuffer(gl, width, height, 0);
+        }
+
+        public void AppendIFCFile(string sPath, OpenGL gl)
+        {
+            int itemStartIndex = ifcParser.ifcItemList.Count;
+            int modelStartIndex = modelList.Count;
+            ifcParser.AppendFile(sPath);
+            AddModel(itemStartIndex);
+            InitDeviceBuffer(gl, width, height, modelStartIndex);
         }
 
         public void InitScene(OpenGL gl, float w, float h)
         {
 
             // 배경 클리어
-            gl.ClearColor(0.4f, 0.4f, 0.4f, 1.0f);
+            gl.ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             // 쉐이더 프로그램 생성
             var vertexShaderSource = ShaderLoader.LoadShaderFile("Shader.vert");
             var fragmentShaderSource = ShaderLoader.LoadShaderFile("Shader.frag");
@@ -108,8 +136,22 @@ namespace IFCViewer
             ifcParser.vertexBuffer.Create(gl);
             ifcParser.indexBuffer.Create(gl);
             SetupLights(gl);
-            
 
+
+            gl.Enable(OpenGL.GL_CULL_FACE);
+            gl.FrontFace(OpenGL.GL_CW);
+
+            gl.Enable(OpenGL.GL_DEPTH_TEST);
+            gl.DepthFunc(OpenGL.GL_LESS);
+
+        }
+        
+        public void resize(float w, float h)
+        {
+            width = w;
+            height = h;
+
+            matProj = camera.Perspective(0.25f * (float)Math.PI, width / height, NEARDEPTH, FARDEPTH);
         }
 
         int[] indices = {
@@ -184,7 +226,7 @@ namespace IFCViewer
 
         }
 
-        public void InitDeviceBuffer(OpenGL gl, float width, float height)
+        public void InitDeviceBuffer(OpenGL gl, float width, float height, int startIndex)
         {
             #region 초점 거리 계산
             vec3 min = new vec3();
@@ -227,17 +269,22 @@ namespace IFCViewer
             
             // 프러스텀의 최대 깊이를 구한다.
             float maxZ = 1.0f;
+
             while(cameraDistance * 2.0f > maxZ)
             {
                 maxZ *= 10.0f;
             }
 
-            matProj = camera.Perspective(0.25f * (float)Math.PI, width / height, 1.0f, maxZ);
+            maxZ *= 10000.0f;
+
+            FARDEPTH = maxZ;
+
+            matProj = camera.Perspective(0.25f * (float)Math.PI, width / height, NEARDEPTH, FARDEPTH);
             #endregion
 
             Int64 vBuffSize = 0, iBuffSize = 0;
 
-            GetFaceBufferSize(ref vBuffSize, ref iBuffSize);
+            GetFaceBufferSize(ref vBuffSize, ref iBuffSize, startIndex);
 
             vertexCount = (int)vBuffSize * 6;
             indexCount = (int)iBuffSize;
@@ -319,10 +366,17 @@ namespace IFCViewer
             }
         }
 
-        private void GetFaceBufferSize(ref Int64 vBuffSize, ref Int64 iBuffSize)
+        private void GetFaceBufferSize(ref Int64 vBuffSize, ref Int64 iBuffSize, int startIndex)
         {
-            for (var i = 0; i < modelList.Count; ++i)
+            if (startIndex != 0)
             {
+                vBuffSize = modelList[startIndex - 1].vertexOffsetForFaces + modelList[startIndex - 1].noVerticesForFaces;
+                iBuffSize = modelList[startIndex - 1].indexOffsetForFaces + 3 * modelList[startIndex - 1].noPrimitivesForFaces;
+            }
+
+            for (var i = startIndex; i < modelList.Count; ++i)
+            {
+
                 if (modelList[i].ifcID != 0 && modelList[i].noVerticesForFaces != 0 && modelList[i].noPrimitivesForFaces != 0)
                 {
                     modelList[i].vertexOffsetForFaces = vBuffSize;
@@ -331,41 +385,28 @@ namespace IFCViewer
                     vBuffSize += modelList[i].noVerticesForFaces;
                     iBuffSize += 3 * modelList[i].noPrimitivesForFaces;
 
-                    if (i != 0)
+                    if (i == 0) continue;
+                    
+                    // 인덱스 오프셋
+                    for (var j = 0; j < modelList[i].indicesForFaces.Length; ++j)
                     {
-                        for (var j = 0; j < modelList[i].indicesForFaces.Length; ++j)
-                        {
-                            modelList[i].indicesForFaces[j] = modelList[i].indicesForFaces[j] + (int)modelList[i].vertexOffsetForFaces;
-                        }
+                        modelList[i].indicesForFaces[j] = modelList[i].indicesForFaces[j] + (int)modelList[i].vertexOffsetForFaces;
                     }
 
                 }
             }
         }
 
-        struct LIGHT
-        {
-            public vec4 diffuse;
-            public vec4 specular;
-            public vec4 ambient;
-            public vec3 position;
-            public vec3 direction;
-            public float range;
-        }
-
-        LIGHT light1 = new LIGHT();
-        LIGHT light2 = new LIGHT();
-        LIGHT light3 = new LIGHT();
+       
 
         private void SetupLights(OpenGL gl)
         {
-
            
-            light1.diffuse  = new vec4(0.1f, 0.1f, 0.1f, 0.1f);
-            light1.specular = new vec4(0.3f, 0.3f, 0.3f, 0.1f);
+            light1.diffuse  = new vec4(0.7f, 0.7f, 0.7f, 0.1f);
+            light1.specular = new vec4(0.7f, 0.7f, 0.7f, 0.1f);
             light1.ambient  = new vec4(0.7f, 0.7f, 0.7f, 0.1f);
             light1.position = new vec3(2.0f, 2.0f, 0.0f);
-            vec3 vecDir = new vec3(-3.0f, -6.0f, -2.0f);
+            vec3 vecDir     = new vec3(-3.0f, -6.0f, -2.0f);
             light1.direction = glm.normalize(vecDir);
             light1.range = 10.0f;
 
@@ -386,7 +427,6 @@ namespace IFCViewer
             vec3 vecDir3    = new vec3(-1.0f, -1.0f, -0.5f);
             light3.direction = glm.normalize(vecDir);
             light3.range = 2.0f;
-
             
         }
 
@@ -399,15 +439,23 @@ namespace IFCViewer
         public void Render(OpenGL gl)
         {
             // 장면 클리어
-            gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
+            gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
 
             shaderProgram.Bind(gl);
             shaderProgram.SetUniformMatrix4(gl, "matProj", matProj.to_array());
             shaderProgram.SetUniformMatrix4(gl, "matView", matView.to_array());
-            shaderProgram.SetUniform3(gl, "diffuseAlbedo",  light1.diffuse.x, light1.diffuse.y, light1.diffuse.z);
-            shaderProgram.SetUniform3(gl, "specularAlbedo", light1.specular.x, light1.specular.y, light1.specular.z);
-            shaderProgram.SetUniform3(gl, "lightDir",       light1.direction.x, light1.direction.y, light1.direction.z);
-            shaderProgram.SetUniform1(gl, "specularPower",  0.5f);
+            shaderProgram.SetUniform3(gl, "dirLight[0].direction", -camera.Look.x, -camera.Look.y, -camera.Look.z);
+            shaderProgram.SetUniform3(gl, "dirLight[0].diffuse", light1.diffuse.x, light1.diffuse.y, light1.diffuse.z);
+            shaderProgram.SetUniform3(gl, "dirLight[0].ambient", light1.ambient.x, light1.ambient.y, light1.ambient.z);
+            shaderProgram.SetUniform3(gl, "dirLight[0].specular", light1.specular.x, light1.specular.y, light1.specular.z);
+            shaderProgram.SetUniform3(gl, "dirLight[1].direction", light2.direction.x, light2.direction.y, light2.direction.z);
+            shaderProgram.SetUniform3(gl, "dirLight[1].diffuse", light2.diffuse.x, light2.diffuse.y, light2.diffuse.z);
+            shaderProgram.SetUniform3(gl, "dirLight[1].ambient", light2.ambient.x, light2.ambient.y, light2.ambient.z);
+            shaderProgram.SetUniform3(gl, "dirLight[1].specular", light2.specular.x, light2.specular.y, light2.specular.z);
+            shaderProgram.SetUniform3(gl, "dirLight[2].direction", light3.direction.x, light3.direction.y, light3.direction.z);
+            shaderProgram.SetUniform3(gl, "dirLight[2].diffuse", light3.diffuse.x, light3.diffuse.y, light3.diffuse.z);
+            shaderProgram.SetUniform3(gl, "dirLight[2].ambient", light3.ambient.x, light3.ambient.y, light3.ambient.z);
+            shaderProgram.SetUniform3(gl, "dirLight[2].specular", light3.specular.x, light3.specular.y, light3.specular.z);
             
 
             if (modelList.Count != 0)
@@ -416,12 +464,18 @@ namespace IFCViewer
 
                 for (var i = 0; i < modelList.Count; ++i)
                 {
+                    shaderProgram.SetUniform3(gl, "material.ambient",   modelList[i].material.ambient.x, modelList[i].material.ambient.y, modelList[i].material.ambient.z);
+                    shaderProgram.SetUniform3(gl, "material.diffuse",   modelList[i].material.diffuse.x, modelList[i].material.diffuse.y, modelList[i].material.diffuse.z);
+                    shaderProgram.SetUniform3(gl, "material.specular",  modelList[i].material.specular.x, modelList[i].material.specular.y, modelList[i].material.specular.z);
+                    shaderProgram.SetUniform3(gl, "material.emissive", modelList[i].material.emissive.x, modelList[i].material.emissive.y, modelList[i].material.emissive.z);
+
                     gl.DrawElements(OpenGL.GL_TRIANGLES, 3 * (int)modelList[i].noPrimitivesForFaces, OpenGL.GL_UNSIGNED_INT, IntPtr.Add(IntPtr.Zero, sizeof(int) * (int)modelList[i].indexOffsetForFaces));
                 }
 
                 ifcParser.vertexBufferArray.Unbind(gl);
             }
 
+            
             //ifcParser.vertexBufferArray.Bind(gl);
             //gl.DrawElements(OpenGL.GL_TRIANGLES, 6, OpenGL.GL_UNSIGNED_INT, IntPtr.Zero);
             //ifcParser.vertexBufferArray.Unbind(gl);

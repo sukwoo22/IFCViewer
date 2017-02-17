@@ -46,9 +46,8 @@ namespace WindowsFormsApplication2
                 return;
             }
             
-            scene.ParseIFCFile(oFD.FileName);
+            scene.ParseIFCFile(oFD.FileName, openGLControl1.OpenGL);
 
-            scene.InitDeviceBuffer(openGLControl1.OpenGL, this.panel1.Width, this.panel1.Height);
 
         }
 
@@ -57,5 +56,26 @@ namespace WindowsFormsApplication2
 
             scene.ClearScene(openGLControl1.OpenGL);
         }
+
+        private void 파일추가하기ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog oFD = new OpenFileDialog();
+            oFD.Filter = "IFC FIles (*.ifc)|*.ifc;*.IFC|ALL Files|*.*";
+
+            if (oFD.ShowDialog(this) != System.Windows.Forms.DialogResult.OK)
+            {
+                MessageBox.Show("Not a valid IFC file");
+                return;
+            }
+
+            scene.AppendIFCFile(oFD.FileName, openGLControl1.OpenGL);
+        }
+
+        private void openGLControl1_Resize(object sender, EventArgs e)
+        {
+            scene.resize(openGLControl1.Width, openGLControl1.Height);
+        }
+
+        
     }
 }

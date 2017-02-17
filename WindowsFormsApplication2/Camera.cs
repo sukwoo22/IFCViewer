@@ -88,6 +88,11 @@ namespace IFCViewer
             get { return pMax; }
         }
 
+        public vec3 Look
+        {
+            get { return vLook; }
+        }
+
 
         private float vec3Dot(vec3 a, vec3 b)
         {

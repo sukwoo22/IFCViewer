@@ -16,53 +16,24 @@ using SharpGL.VertexBuffers;
 
 namespace IFCViewer
 {
+    struct Material
+    {
+
+        public vec3 ambient;
+        public vec3 diffuse;
+        public vec3 specular;
+        public vec3 emissive;
+        public float transparency;
+        public float power;
+               
+    }
+
     class IFCItem
     {
-        public void  CreateItem(IFCItem parent, int ifcID, string ifcType, string globalID, string name, string desc)
+       
+        public void CreateItem(Int64 ifcID, string ifcType, string globalID, string name, string desc)
         {
 
-            this.parent = parent;
-            this.next = null;
-            this.child = null;
-            this.globalID = globalID;
-            this.ifcIDx86 = ifcID;
-            this.ifcType = ifcType;
-            this.description = desc;
-            this.name = name;
-
-            if (parent != null)
-            {
-                if (parent.child == null)
-                {
-                    parent.child = this;
-                }
-                else
-                {
-                    IFCItem NextChild = parent;
-
-                    while (true)
-                    {
-                        if (NextChild.next == null)
-                        {
-                            NextChild.next = this;
-                            break;
-                        }
-                        else
-                        {
-                            NextChild = NextChild.next;
-                        }
-
-                    }
-
-                }
-
-            }
-        }
-
-        public void CreateItem(IFCItem parent, Int64 ifcID, string ifcType, string globalID, string name, string desc)
-        {
-
-            this.parent = parent;
             this.next = null;
             this.child = null;
             this.globalID = globalID;
@@ -70,34 +41,7 @@ namespace IFCViewer
             this.ifcType = ifcType;
             this.description = desc;
             this.name = name;
-
-            if (parent != null)
-            {
-                if (parent.child == null)
-                {
-                    parent.child = this;
-                }
-                else
-                {
-                    IFCItem NextChild = parent;
-
-                    while (true)
-                    {
-                        if (NextChild.next == null)
-                        {
-                            NextChild.next = this;
-                            break;
-                        }
-                        else
-                        {
-                            NextChild = NextChild.next;
-                        }
-
-                    }
-
-                }
-
-            }
+            this.isActiveMaterial = false;
         }
 
         public int ifcIDx86 = 0;
@@ -131,6 +75,8 @@ namespace IFCViewer
         public int[] indicesForWireFrameLineParts;
         public Int64 vertexOffsetForWireFrame;
         public Int64 indexOffsetForWireFrame;
+        public bool isActiveMaterial;
+        public Material material; 
 
         public IFCTreeItem ifcTreeItem = null;
     }
@@ -141,6 +87,8 @@ namespace IFCViewer
         private IFCItem _rootIfcItem = null;
         private Control _destControl = null;
         private TreeView _treeControl = null;
+        private Int64 ifcModel = 0;
+        private Int64 ifcItemCount = 0;
         public List<IFCItem> ifcItemList = new List<IFCItem>();
         public VertexBufferArray vertexBufferArray = new VertexBufferArray();
         public VertexBuffer vertexBuffer = new VertexBuffer();
@@ -149,6 +97,8 @@ namespace IFCViewer
         private static IFCViewerWrapper instance = new IFCViewerWrapper();
 
         private IFCViewerWrapper() { }
+
+        
 
         public static IFCViewerWrapper Instance
         {
@@ -167,7 +117,9 @@ namespace IFCViewer
 
             if (true == File.Exists(sPath))
             {
-                Int64 ifcModel = IfcEngine.x64.sdaiOpenModelBN(0, sPath, "IFC2X3_TC1.exp");
+                ifcModel = IfcEngine.x64.sdaiOpenModelBN(0, sPath, "IFC2X3_TC1.exp");
+
+
 
                 string xmlSettings_IFC2x3 = @"IFC2X3-Settings.xml";
                 string xmlSettings_IFC4 = @"IFC4-Settings.xml";
@@ -224,8 +176,7 @@ namespace IFCViewer
                     }
 
                     int a = 0;
-                    GenerateGeometry(ifcModel, _rootIfcItem, ref a);
-                   
+                    GenerateGeometry(ifcModel, a);
 
                     // -----------------------------------------------------------------
                     // Generate Tree Control
@@ -235,6 +186,7 @@ namespace IFCViewer
                     // -----------------------------------------------------------------
 
                     IfcEngine.x64.sdaiCloseModel(ifcModel);
+                    ifcModel = 0;
 
                     return true;
                 }
@@ -242,6 +194,91 @@ namespace IFCViewer
 
             return false;
         }
+
+        public bool AppendFile(String sPath)
+        {
+
+            if (true == File.Exists(sPath))
+            {
+                int startIndex = ifcItemList.Count;
+
+
+                ifcModel = IfcEngine.x64.sdaiOpenModelBN(0, sPath, "IFC2X3_TC1.exp");
+
+                string xmlSettings_IFC2x3 = @"IFC2X3-Settings.xml";
+                string xmlSettings_IFC4 = @"IFC4-Settings.xml";
+
+                if (ifcModel != 0)
+                {
+
+                    IntPtr outputValue = IntPtr.Zero;
+
+                    IfcEngine.x64.GetSPFFHeaderItem(ifcModel, 9, 0, IfcEngine.x64.sdaiUNICODE, out outputValue);
+
+                    string s = Marshal.PtrToStringUni(outputValue);
+
+
+                    XmlTextReader textReader = null;
+                    if (s.Contains("IFC2") == true)
+                    {
+                        textReader = new XmlTextReader(xmlSettings_IFC2x3);
+                    }
+                    else
+                    {
+                        if (s.Contains("IFC4") == true)
+                        {
+                            IfcEngine.x64.sdaiCloseModel(ifcModel);
+                            ifcModel = IfcEngine.x64.sdaiOpenModelBN(0, sPath, "IFC4.exp");
+
+                            if (ifcModel != 0)
+                                textReader = new XmlTextReader(xmlSettings_IFC4);
+                        }
+                    }
+
+                    if (textReader == null)
+                        return false;
+
+                    // if node type us an attribute
+                    while (textReader.Read())
+                    {
+                        textReader.MoveToElement();
+
+                        if (textReader.AttributeCount > 0)
+                        {
+                            if (textReader.LocalName == "object")
+                            {
+                                if (textReader.GetAttribute("name") != null)
+                                {
+
+                                    string Name = textReader.GetAttribute("name").ToString();
+
+                                    RetrieveObjects(ifcModel, Name, Name);
+
+                                }
+                            }
+                        }
+                    }
+
+                    int a = startIndex;
+                    GenerateGeometry(ifcModel, a);
+
+                    // -----------------------------------------------------------------
+                    // Generate Tree Control
+                    //_treeData.BuildTree(this, ifcModel, _rootIfcItem, _treeControl);
+
+
+                    // -----------------------------------------------------------------
+
+                    IfcEngine.x64.sdaiCloseModel(ifcModel);
+                    ifcModel = 0;
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
 
 #region 32비트 함수
         //private void RetrieveObjects(int ifcModel, string sObjectSPFFName, string ObjectDisplayName)
@@ -369,7 +406,7 @@ namespace IFCViewer
                     string description = Marshal.PtrToStringUni((IntPtr)value);
 
                     IFCItem ifcItem = new IFCItem();
-                    ifcItem.CreateItem(null, ifcObjectIns, ObjectDisplayName, globalID, name, description);
+                    ifcItem.CreateItem(ifcObjectIns, ObjectDisplayName, globalID, name, description);
 
                     ifcItemList.Add(ifcItem);
 
@@ -380,9 +417,9 @@ namespace IFCViewer
 
        
 
-        private void GenerateGeometry(long ifcModel, IFCItem _rootIfcItem, ref int a)
+        private void GenerateGeometry(long ifcModel, int startIndex)
         {
-            for (var i = 0; i < ifcItemList.Count; ++i)
+            for (var i = startIndex; i < ifcItemList.Count; ++i)
             {
                 // -----------------------------------------------------------------
                 // 기하 구조 생성
@@ -397,9 +434,11 @@ namespace IFCViewer
                 setting += IfcEngine.x64.flagbit5;     //    NORMALS ON
                 setting += IfcEngine.x64.flagbit8;     //    TRIANGLES ON
                 setting += 0;			 //    WIREFRAME OFF 
-               IfcEngine.x64.setFormat(ifcModel, setting, mask);
+                IfcEngine.x64.setFormat(ifcModel, setting, mask);
 
                 GenerateFacesGeometry(ifcModel, ifcItemList[i]);
+
+                CreateMaterial(ifcItemList[i]);
 
                 IfcEngine.x64.cleanMemory(ifcModel, 0);
 
@@ -420,7 +459,6 @@ namespace IFCViewer
                     ifcItem.noPrimitivesForFaces = noIndices / 3;
                     ifcItem.verticesForFaces = new float[6 * noVertices];
                     ifcItem.indicesForFaces = new int[noIndices];
-
 
                     IfcEngine.x64.finalizeModelling(ifcModel, ifcItem.verticesForFaces, ifcItem.indicesForFaces, 0);
                    
@@ -450,6 +488,245 @@ namespace IFCViewer
         public void SelectItem(IFCItem ifcItem)
         {
 
+        }
+
+        
+        private void CreateMaterial(IFCItem item)
+        {
+            if (item.noVerticesForFaces != 0)
+            {
+                // C++ => getRGB_object()
+                IntPtr representationInstance;
+                IfcEngine.x64.sdaiGetAttrBN(item.ifcID, "Representation", IfcEngine.x64.sdaiINSTANCE, out representationInstance);
+                if (representationInstance == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                // C++ => getRGB_productDefinitionShape()
+                IntPtr representationsInstance;
+                IfcEngine.x64.sdaiGetAttrBN(representationInstance.ToInt64(), "Representations", IfcEngine.x64.sdaiAGGR, out representationsInstance);
+
+                Int64 iRepresentationsCount = IfcEngine.x64.sdaiGetMemberCount(representationsInstance.ToInt64());
+                for (Int64 iRepresentation = 0; iRepresentation < iRepresentationsCount; iRepresentation++)
+                {
+                    Int64 iShapeInstance = 0;
+                    IfcEngine.x64.engiGetAggrElement(representationsInstance.ToInt64(), iRepresentation, IfcEngine.x64.sdaiINSTANCE, out iShapeInstance);
+
+                    if (iShapeInstance == 0)
+                    {
+                        continue;
+                    }
+
+                    // C++ => getRGB_shapeRepresentation()
+                    IntPtr representationIdentifier;
+                    IfcEngine.x64.sdaiGetAttrBN(iShapeInstance, "RepresentationIdentifier", IfcEngine.x64.sdaiSTRING, out representationIdentifier);
+
+                    if (Marshal.PtrToStringAnsi(representationIdentifier) == "Body")
+                    {
+                        IntPtr itemsInstance;
+                        IfcEngine.x64.sdaiGetAttrBN(iShapeInstance, "Items", IfcEngine.x64.sdaiAGGR, out itemsInstance);
+
+                        Int64 iItemsCount = IfcEngine.x64.sdaiGetMemberCount(itemsInstance.ToInt64());
+                        for (Int64 iItem = 0; iItem < iItemsCount; iItem++)
+                        {
+                            Int64 iItemInstance = 0;
+                            IfcEngine.x64.engiGetAggrElement(itemsInstance.ToInt64(), iItem, IfcEngine.x64.sdaiINSTANCE, out iItemInstance);
+
+                            IntPtr styledByItem;
+                            IfcEngine.x64.sdaiGetAttrBN(iItemInstance, "StyledByItem", IfcEngine.x64.sdaiINSTANCE, out styledByItem);
+
+                            if (styledByItem != IntPtr.Zero)
+                            {
+                                getRGB_styledItem(item, styledByItem.ToInt64());
+                            }
+                            else
+                            {
+                                searchDeeper(item, iItemInstance);
+                            } // else if (iItemInstance != 0)
+
+                            if (item.isActiveMaterial)
+                            {
+                                return;
+                            }
+                        } // for (int iItem = ...
+                    }
+                } // for (int iRepresentation = ...
+            }
+        }
+
+
+        private void searchDeeper(IFCItem item, Int64 iParentInstance)
+        {
+            IntPtr styledByItem;
+            IfcEngine.x64.sdaiGetAttrBN(iParentInstance, "StyledByItem", IfcEngine.x64.sdaiINSTANCE, out styledByItem);
+
+            if (styledByItem != IntPtr.Zero)
+            {
+                getRGB_styledItem(item, styledByItem.ToInt64());
+                if (item.isActiveMaterial)
+                {
+                    return;
+                }
+            }
+
+            if (IsInstanceOf(iParentInstance, "IFCBOOLEANCLIPPINGRESULT"))
+            {
+                IntPtr firstOperand;
+                IfcEngine.x64.sdaiGetAttrBN(iParentInstance, "FirstOperand", IfcEngine.x64.sdaiINSTANCE, out firstOperand);
+
+                if (firstOperand != IntPtr.Zero)
+                {
+                    searchDeeper(item, firstOperand.ToInt64());
+                }
+            } // if (IsInstanceOf(iParentInstance, "IFCBOOLEANCLIPPINGRESULT"))
+            else
+            {
+                if (IsInstanceOf(iParentInstance, "IFCMAPPEDITEM"))
+                {
+                    IntPtr mappingSource;
+                    IfcEngine.x64.sdaiGetAttrBN(iParentInstance, "MappingSource", IfcEngine.x64.sdaiINSTANCE, out mappingSource);
+
+                    IntPtr mappedRepresentation;
+                    IfcEngine.x64.sdaiGetAttrBN(mappingSource.ToInt64(), "MappedRepresentation", IfcEngine.x64.sdaiINSTANCE, out mappedRepresentation);
+
+                    if (mappedRepresentation != IntPtr.Zero)
+                    {
+                        IntPtr representationIdentifier;
+                        IfcEngine.x64.sdaiGetAttrBN(mappedRepresentation.ToInt64(), "RepresentationIdentifier", IfcEngine.x64.sdaiSTRING, out representationIdentifier);
+
+                        if (Marshal.PtrToStringAnsi(representationIdentifier) == "Body")
+                        {
+                            IntPtr itemsInstance;
+                            IfcEngine.x64.sdaiGetAttrBN(mappedRepresentation.ToInt64(), "Items", IfcEngine.x64.sdaiAGGR, out itemsInstance);
+
+                            Int64 iItemsCount = IfcEngine.x64.sdaiGetMemberCount(itemsInstance.ToInt64());
+                            for (Int64 iItem = 0; iItem < iItemsCount; iItem++)
+                            {
+                                Int64 iItemInstance = 0;
+                                IfcEngine.x64.engiGetAggrElement(itemsInstance.ToInt64(), iItem, IfcEngine.x64.sdaiINSTANCE, out iItemInstance);
+
+                                styledByItem = IntPtr.Zero;
+                                IfcEngine.x64.sdaiGetAttrBN(iItemInstance, "StyledByItem", IfcEngine.x64.sdaiINSTANCE, out styledByItem);
+
+                                if (styledByItem != IntPtr.Zero)
+                                {
+                                    getRGB_styledItem(item, styledByItem.ToInt64());
+                                }
+                                else
+                                {
+                                    searchDeeper(item, iItemInstance);
+                                } // else if (iItemInstance != 0)
+
+                                if (item.isActiveMaterial)
+                                {
+                                    return;
+                                }
+                            } // for (int iItem = ...
+                        } // if (Marshal.PtrToStringAnsi(representationIdentifier) == "Body")
+                    } // if (mappedRepresentation != IntPtr.Zero)
+                } // if (IsInstanceOf(iParentInstance, "IFCMAPPEDITEM"))
+            } // else if (IsInstanceOf(iParentInstance, "IFCBOOLEANCLIPPINGRESULT"))
+        }
+
+        private bool IsInstanceOf(Int64 iInstance, string strType)
+        {
+            if (IfcEngine.x64.sdaiGetInstanceType(iInstance) == IfcEngine.x64.sdaiGetEntity(ifcModel, strType))
+            {
+                return true;
+            }
+
+            return false;
+        }        
+
+
+        private void getRGB_styledItem(IFCItem item, Int64 iStyledByItemInstance)
+        {
+            IntPtr stylesInstance;
+            IfcEngine.x64.sdaiGetAttrBN(iStyledByItemInstance, "Styles", IfcEngine.x64.sdaiAGGR, out stylesInstance);
+
+            Int64 iStylesCount = IfcEngine.x64.sdaiGetMemberCount(stylesInstance.ToInt64());
+            for (Int64 iStyle = 0; iStyle < iStylesCount; iStyle++)
+            {
+                Int64 iStyleInstance = 0;
+                IfcEngine.x64.engiGetAggrElement(stylesInstance.ToInt64(), iStyle, IfcEngine.x64.sdaiINSTANCE, out iStyleInstance);
+
+                if (iStyleInstance == 0)
+                {
+                    continue;
+                }
+
+                getRGB_presentationStyleAssignment(item, iStyleInstance);
+            } // for (int iStyle = ...
+        }
+
+
+        private void getRGB_presentationStyleAssignment(IFCItem item, Int64 iParentInstance)
+        {
+            IntPtr stylesInstance;
+            IfcEngine.x64.sdaiGetAttrBN(iParentInstance, "Styles", IfcEngine.x64.sdaiAGGR, out stylesInstance);
+
+            Int64 iStylesCount = IfcEngine.x64.sdaiGetMemberCount(stylesInstance.ToInt64());
+            for (Int64 iStyle = 0; iStyle < iStylesCount; iStyle++)
+            {
+                Int64 iStyleInstance = 0;
+                IfcEngine.x64.engiGetAggrElement(stylesInstance.ToInt64(), iStyle, IfcEngine.x64.sdaiINSTANCE, out iStyleInstance);
+
+                if (iStyleInstance == 0)
+                {
+                    continue;
+                }
+
+                getRGB_surfaceStyle(item, iStyleInstance);
+            } // for (int iStyle = ...
+        }
+
+        private unsafe void getRGB_surfaceStyle(IFCItem item, Int64 iParentInstance)
+        {
+            IntPtr stylesInstance;
+            IfcEngine.x64.sdaiGetAttrBN(iParentInstance, "Styles", IfcEngine.x64.sdaiAGGR, out stylesInstance);
+
+            Int64 iStylesCount = IfcEngine.x64.sdaiGetMemberCount(stylesInstance.ToInt64());
+            for (Int64 iStyle = 0; iStyle < iStylesCount; iStyle++)
+            {
+                Int64 iStyleInstance = 0;
+                IfcEngine.x64.engiGetAggrElement(stylesInstance.ToInt64(), iStyle, IfcEngine.x64.sdaiINSTANCE, out iStyleInstance);
+
+                if (iStyleInstance == 0)
+                {
+                    continue;
+                }
+
+                IntPtr surfaceColour;
+                IfcEngine.x64.sdaiGetAttrBN(iStyleInstance, "SurfaceColour", IfcEngine.x64.sdaiINSTANCE, out surfaceColour);
+
+                if (surfaceColour == IntPtr.Zero)
+                {
+                    continue;
+                }
+
+                double R = 0;
+                IfcEngine.x64.sdaiGetAttrBN(surfaceColour.ToInt64(), "Red", IfcEngine.x64.sdaiREAL, out *(IntPtr*)&R);
+
+                double G = 0;
+                IfcEngine.x64.sdaiGetAttrBN(surfaceColour.ToInt64(), "Green", IfcEngine.x64.sdaiREAL, out *(IntPtr*)&G);
+
+                double B = 0;
+                IfcEngine.x64.sdaiGetAttrBN(surfaceColour.ToInt64(), "Blue", IfcEngine.x64.sdaiREAL, out *(IntPtr*)&B);
+
+                IFCItemColor ifcColor = new IFCItemColor();
+                ifcColor.R = (float)R;
+                ifcColor.G = (float)G;
+                ifcColor.B = (float)B;
+
+                item.material = new Material();
+                item.isActiveMaterial = true;
+                item.material.diffuse = item.material.specular = item.material.ambient = new vec3(ifcColor.R, ifcColor.G, ifcColor.B);
+                item.material.emissive = new vec3(ifcColor.R * 0.5f, ifcColor.G * 0.5f, ifcColor.B * 0.5f);
+                item.material.power = 0.5f;
+
+                return;
+            } // for (int iStyle = ...
         }
     }
 }

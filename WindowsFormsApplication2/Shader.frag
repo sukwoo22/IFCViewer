@@ -1,6 +1,5 @@
 ﻿#version 430 core
 
-out vec4 outputColor;
 
 in VSOUT
 {
@@ -8,24 +7,43 @@ in VSOUT
 	vec3 v;
 }fsIn;
 
+out vec4 outputColor;
 
-in vec3 passColor;
+struct DirLight
+{
+	vec3 direction;
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+};
 
-uniform vec3 diffuseAlbedo = vec3(0.5, 0.2, 0.7);
-uniform vec3 specularAlbedo = vec3(0.7);
-uniform vec3 lightDir;
-uniform float specularPower = 200.0;
+struct Material
+{
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+	vec3 emissive;
+};
+
+float specularPower = 0.5;
+
+uniform DirLight dirLight[3];
+uniform Material material;
 
 void main(void)
 {
 	vec3 n = normalize(fsIn.n);
-	vec3 l = normalize(lightDir);
 	vec3 v = normalize(fsIn.v);
-	vec3 h = normalize(l + v); 
 
-	vec3 diffuse = max(dot(n,l), 0.0) * diffuseAlbedo;
-	vec3 specular = pow(max(dot(n,h), 0.0), specularPower) * specularAlbedo;
-
-	outputColor = vec4(diffuse + specular, 1.0);
-	//outputColor = vec4(passColor, 1.0);
+	for(int i =0; i < 1; ++i)
+	{
+		vec3 l = normalize(-dirLight[i].direction);
+		vec3 h = normalize(l + v);
+		vec3 ambient = dirLight[i].ambient * material.ambient * 0.5;
+		vec3 diffuse = max(dot(n,l), 0.0) * dirLight[i].diffuse * material.diffuse;
+		vec3 specular = pow(max(dot(n,h), 0.0), specularPower) * dirLight[i].specular * material.specular;
+		outputColor = vec4(ambient + diffuse + specular, 1.0);	
+		
+	}
 }
+

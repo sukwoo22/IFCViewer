@@ -64,6 +64,7 @@
             this.openGLControl1.TabIndex = 0;
             this.openGLControl1.OpenGLInitialized += new System.EventHandler(this.openGLControl1_OpenGLInitialized);
             this.openGLControl1.OpenGLDraw += new SharpGL.RenderEventHandler(this.openGLControl1_OpenGLDraw);
+            this.openGLControl1.Resize += new System.EventHandler(this.openGLControl1_Resize);
             // 
             // menuStrip1
             // 
@@ -102,8 +103,9 @@
             // 파일추가하기ToolStripMenuItem
             // 
             this.파일추가하기ToolStripMenuItem.Name = "파일추가하기ToolStripMenuItem";
-            this.파일추가하기ToolStripMenuItem.Size = new System.Drawing.Size(150, 22);
+            this.파일추가하기ToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
             this.파일추가하기ToolStripMenuItem.Text = "파일 추가하기";
+            this.파일추가하기ToolStripMenuItem.Click += new System.EventHandler(this.파일추가하기ToolStripMenuItem_Click);
             // 
             // Form1
             // 
