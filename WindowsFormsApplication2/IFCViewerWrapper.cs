@@ -697,6 +697,9 @@ namespace IFCViewer
                     continue;
                 }
 
+                double transparency = 0;
+                IfcEngine.x64.sdaiGetAttrBN(iStyleInstance, "Transparency", IfcEngine.x64.sdaiREAL, out transparency);
+                
                 IntPtr surfaceColour;
                 IfcEngine.x64.sdaiGetAttrBN(iStyleInstance, "SurfaceColour", IfcEngine.x64.sdaiINSTANCE, out surfaceColour);
 
@@ -714,16 +717,61 @@ namespace IFCViewer
                 double B = 0;
                 IfcEngine.x64.sdaiGetAttrBN(surfaceColour.ToInt64(), "Blue", IfcEngine.x64.sdaiREAL, out *(IntPtr*)&B);
 
-                IFCItemColor ifcColor = new IFCItemColor();
-                ifcColor.R = (float)R;
-                ifcColor.G = (float)G;
-                ifcColor.B = (float)B;
-
                 item.material = new Material();
+                item.material.transparency = (float)transparency;
                 item.isActiveMaterial = true;
-                item.material.diffuse = item.material.specular = item.material.ambient = new vec3(ifcColor.R, ifcColor.G, ifcColor.B);
-                item.material.emissive = new vec3(ifcColor.R * 0.5f, ifcColor.G * 0.5f, ifcColor.B * 0.5f);
+                item.material.ambient = new vec3((float)R, (float)G, (float)B);
+                item.material.emissive = new vec3((float)R * 0.5f, (float)G * 0.5f, (float)B * 0.5f);
                 item.material.power = 0.5f;
+
+                IntPtr diffuseColour;
+                IfcEngine.x64.sdaiGetAttrBN(iStyleInstance, "DiffuseColour", IfcEngine.x64.sdaiINSTANCE, out diffuseColour);
+
+                if (diffuseColour != IntPtr.Zero)
+                {
+                    IfcEngine.x64.sdaiGetAttrBN(diffuseColour.ToInt64(), "Red",     IfcEngine.x64.sdaiREAL, out *(IntPtr*)&R);
+                    IfcEngine.x64.sdaiGetAttrBN(diffuseColour.ToInt64(), "Green",   IfcEngine.x64.sdaiREAL, out *(IntPtr*)&G);
+                    IfcEngine.x64.sdaiGetAttrBN(diffuseColour.ToInt64(), "Blue",    IfcEngine.x64.sdaiREAL, out *(IntPtr*)&B);
+
+                    item.material.diffuse = new vec3((float)R, (float)G, (float)B);
+                }
+                else
+                {
+                    IntPtr ADB;
+                    IfcEngine.x64.sdaiGetAttrBN(iStyleInstance, "DiffuseColour", IfcEngine.x64.sdaiADB, out ADB);
+                    if (ADB != IntPtr.Zero)
+                    {
+                        double value = 0;
+                        IfcEngine.x64.sdaiGetADBValue(ADB.ToInt64(), IfcEngine.x64.sdaiREAL, out *(IntPtr*)&value);
+                        item.material.diffuse = (float)value * item.material.ambient;
+
+                    }
+                }
+
+                IntPtr specularColour;
+                IfcEngine.x64.sdaiGetAttrBN(iStyleInstance, "SpecularColour", IfcEngine.x64.sdaiINSTANCE, out specularColour);
+
+                if(specularColour != IntPtr.Zero)
+                {
+                    IfcEngine.x64.sdaiGetAttrBN(specularColour.ToInt64(), "Red",    IfcEngine.x64.sdaiREAL, out *(IntPtr*)&R);
+                    IfcEngine.x64.sdaiGetAttrBN(specularColour.ToInt64(), "Green",  IfcEngine.x64.sdaiREAL, out *(IntPtr*)&G);
+                    IfcEngine.x64.sdaiGetAttrBN(specularColour.ToInt64(), "Blue",   IfcEngine.x64.sdaiREAL, out *(IntPtr*)&B);
+
+                    item.material.specular = new vec3((float)R, (float)G, (float)B);
+                }
+                else
+                {
+                    IntPtr ADB;
+                    IfcEngine.x64.sdaiGetAttrBN(iStyleInstance, "SpecularColour", IfcEngine.x64.sdaiADB, out ADB);
+                    if(ADB != IntPtr.Zero)
+                    {
+                        double value = 0;
+                        IfcEngine.x64.sdaiGetADBValue(ADB.ToInt64(), IfcEngine.x64.sdaiREAL, out *(IntPtr*)&value);
+                        item.material.specular = (float)value * item.material.ambient;
+
+                    }
+                }
+               
 
                 return;
             } // for (int iStyle = ...

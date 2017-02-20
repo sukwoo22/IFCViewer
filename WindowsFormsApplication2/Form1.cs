@@ -19,6 +19,7 @@ namespace WindowsFormsApplication2
         {
             InitializeComponent();
 
+            this.MouseWheel += new MouseEventHandler(openGLControl1_MouseWheel);
         }
 
         private void openGLControl1_OpenGLDraw(object sender, SharpGL.RenderEventArgs args)
@@ -76,6 +77,10 @@ namespace WindowsFormsApplication2
             scene.resize(openGLControl1.Width, openGLControl1.Height);
         }
 
+        private void openGLControl1_MouseWheel(object sender, MouseEventArgs e)
+        {
+            scene.Zoom(e.Delta);
+        }
         
     }
 }

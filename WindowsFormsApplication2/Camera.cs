@@ -33,29 +33,15 @@ namespace IFCViewer
         // 이동 계수
         private float moveCoef = 1.0f;
 
-        // 모델 중심점
+        // 카메라가 바라보는 목표
         private vec3 pCenter;
 
-        // 전체 모델의 최소 위치
-        private vec3 pMin;
+        private float nearDepth = 1.0f;
 
-        // 전체 모델의 최대 위치
-        private vec3 pMax;
+        private float farDepth = 10.0f;
 
-        private void calculateCameraDistance(vec3 posMax, vec3 posMin)
-        {
-            cameraDistance = 0.33334f * (posMax.x - posMin.x + posMax.y - posMin.y + posMax.z - posMax.z);
-        }
 
-        private void updateCoef(ref vec3 center)
-        {
-            vec3 temp = center - pEye;
-
-            moveCoef = Math.Abs(temp.x) + Math.Abs(temp.y) + Math.Abs(temp.z);
-
-            moveCoef = moveCoef < 1.0f ? 1.0f : moveCoef;
-        }
-
+        #region 싱글톤
         private static Camera instance = new Camera();
 
         private Camera() { }
@@ -67,7 +53,9 @@ namespace IFCViewer
                 return instance;
             }
         }
+        #endregion
 
+        #region 프로퍼티
         public mat4 MatView
         {
             get { return matView; }
@@ -78,55 +66,35 @@ namespace IFCViewer
             get { return matProj; }
         }
 
-        public vec3 PosMin
-        {
-            get { return pMin; }
-        }
-
-        public vec3 PosMax
-        {
-            get { return pMax; }
-        }
-
         public vec3 Look
         {
             get { return vLook; }
         }
 
-
-        private float vec3Dot(vec3 a, vec3 b)
+        public vec3 Center
         {
-            return a.x * b.x + a.y * b.y + a.z * b.z;
+            set { pCenter = value; }
+            get { return pCenter; }
         }
 
-        private void vec3TransformNormal(ref vec3 vec, ref mat4 m)
+        public float NearDepth
         {
-            vec3 temp = new vec3(m[0, 0] * vec.x + m[1, 0] * vec.y + m[2, 0] * vec.z,
-                                 m[0, 1] * vec.x + m[1, 1] * vec.y + m[2, 1] * vec.z,
-                                 m[0, 2] * vec.x + m[1, 2] * vec.y + m[2, 2] * vec.z);
-
-            
-            vec = glm.normalize(temp);
+            set { nearDepth = value; }
+            get { return nearDepth; }
         }
 
-        //vec3 vec3TransformNormal(ref vec3 vec, ref mat4 m)
-        //{
-        //    vec3 temp = new vec3(m[0, 0] * vec.x + m[1, 0] * vec.y + m[2, 0] * vec.z,
-        //                        m[0, 1] * vec.x + m[1, 1] * vec.y + m[2, 1] * vec.z,
-        //                        m[0, 2] * vec.x + m[1, 2] * vec.y + m[2, 2] * vec.z);
-
-
-        //    return glm.normalize(temp);
-        //}
-
-        private void vec3TransformCoord(ref vec3 pos, ref mat4 m)
+        public float FarDepth
         {
-            vec3 temp = new vec3(m[0, 0] * pos.x + m[1, 0] * pos.y + m[2, 0] * pos.z + m[3, 0] * 1.0f,
-                                m[0, 1] * pos.x + m[1, 1] * pos.y + m[2, 1] * pos.z + m[3, 1] * 1.0f,
-                                m[0, 2] * pos.x + m[1, 2] * pos.y + m[2, 2] * pos.z + m[3, 2] * 1.0f);
-
-            pos = temp;
+            set { farDepth = value; }
+            get { return farDepth; }
         }
+
+        public float CameraDistance
+        {
+            set { cameraDistance = value; }
+            get { return cameraDistance; }
+        }
+        #endregion
 
         // 카메라 파라미터 및 뷰 행렬 생성
         public mat4 LookAt(vec3 eye, vec3 target, vec3 u)
@@ -138,19 +106,18 @@ namespace IFCViewer
 
             pEye = eye;
 
-            eye = new vec3(-vec3Dot(vSide, eye), -vec3Dot(vUp, eye), -vec3Dot(vLook, eye));
+            eye = new vec3(-VecMath.vec3Dot(vSide, eye), -VecMath.vec3Dot(vUp, eye), -VecMath.vec3Dot(vLook, eye));
 
             vec4[] temp = new vec4[4];
-            temp[0] = new vec4(vSide.x, vUp.x, vLook[0], 0.0f);
-            temp[1] = new vec4(vSide.y, vUp.y, vLook[1], 0.0f);
-            temp[2] = new vec4(vSide.z, vUp.z, vLook[2], 0.0f);
+            temp[0] = new vec4(vSide.x, vUp.x, vLook.x, 0.0f);
+            temp[1] = new vec4(vSide.y, vUp.y, vLook.y, 0.0f);
+            temp[2] = new vec4(vSide.z, vUp.z, vLook.z, 0.0f);
             temp[3] = new vec4(eye.x, eye.y, eye.z, 1.0f);
 
             matView = new mat4(temp);
 
             return matView;
         }
-
 
         // 원근 투영 행렬 생성
         public mat4 Perspective(float fovY, float aspect, float n, float f)
@@ -173,6 +140,22 @@ namespace IFCViewer
             return matProj;
         }
 
+
+        public void updateCoef()
+        {
+            vec3 temp = pCenter - pEye;
+
+            float currentDistance = (float)Math.Sqrt((double)VecMath.vec3Dot(temp, temp));
+
+            if (currentDistance / cameraDistance < 0.01f) currentDistance = 0.01f * cameraDistance;
+
+            if (currentDistance > cameraDistance) currentDistance = cameraDistance;
+
+            moveCoef = 0.4f * currentDistance;
+
+        }
+
+
         // 뷰 행렬 업데이트
         public void UpdateViewMatrix()
         {
@@ -185,8 +168,7 @@ namespace IFCViewer
             // side 벡터
             vSide = glm.normalize(vSide);
 
-            
-            vec4 p = new vec4(-vec3Dot(vSide, pEye), -vec3Dot(vUp, pEye), -vec3Dot(vLook, pEye), 1.0f);
+            vec4 p = new vec4(-VecMath.vec3Dot(vSide, pEye), -VecMath.vec3Dot(vUp, pEye), -VecMath.vec3Dot(vLook, pEye), 1.0f);
 
             vec4[] temp = new vec4[4];
 
@@ -201,27 +183,39 @@ namespace IFCViewer
 
         }
 
-
+        // 좌우 이동
         public void Strafe(float d)
         {
             pEye += -0.3f * moveCoef * d * vSide;
         }
 
+        // 상하 이동
         public void Zump(float d)
         {
             pEye += 0.3f * moveCoef * d * vUp;
         }
 
+        // 앞뒤 이동
         public void Walk(float d)
         {
-            pEye += 1.0f * cameraDistance * d * vLook;
+            vec3 prevHead = pCenter - pEye; 
+
+            pEye += 1.0f * moveCoef * d * vLook;
+
+            vec3 currHead = pCenter - pEye;
+
+            if(VecMath.vec3Dot(prevHead, currHead) < 0.9999)
+            {
+                pEye = vLook + pCenter;
+            }
+
         }
 
         public void Yaw(float angle)
         {
             mat4 rot = glm.rotate(new mat4(1.0f), angle, new vec3(0.0f, 0.0f, 1.0f));
 
-            vec3TransformNormal(ref vSide, ref rot);
+            VecMath.vec3TransformNormal(ref vSide, ref rot);
 
             vLook = glm.cross(vSide, vUp);
 
@@ -233,7 +227,7 @@ namespace IFCViewer
         {
             mat4 rot = glm.rotate(new mat4(1.0f), angle, new vec3(1.0f, 0.0f, 0.0f));
 
-            vec3TransformNormal(ref vUp, ref rot);
+            VecMath.vec3TransformNormal(ref vUp, ref rot);
 
             vLook = glm.cross(vSide, vUp);
 

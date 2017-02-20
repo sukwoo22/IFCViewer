@@ -25,9 +25,6 @@ namespace IFCViewer
             vec = glm.normalize(temp);
         }
 
-
-
-
         public static void vec3TransformCoord(ref vec3 pos, ref mat4 m)
         {
             vec3 temp = new vec3(m[0, 0] * pos.x + m[1, 0] * pos.y + m[2, 0] * pos.z + m[3, 0] * 1.0f,
@@ -36,5 +33,6 @@ namespace IFCViewer
 
             pos = temp;
         }
+       
     }
 }
