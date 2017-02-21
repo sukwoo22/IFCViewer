@@ -23,6 +23,7 @@ struct Material
 	vec3 diffuse;
 	vec3 specular;
 	vec3 emissive;
+	float transparency;
 };
 
 float specularPower = 0.5;
@@ -42,7 +43,7 @@ void main(void)
 		vec3 ambient = dirLight[i].ambient * material.ambient * 0.5;
 		vec3 diffuse = max(dot(n,l), 0.0) * dirLight[i].diffuse * material.diffuse;
 		vec3 specular = pow(max(dot(n,h), 0.0), specularPower) * dirLight[i].specular * material.specular;
-		outputColor = vec4(ambient + diffuse + specular, 1.0);	
+		outputColor = vec4(ambient + diffuse + specular, material.transparency);	
 		
 	}
 }
