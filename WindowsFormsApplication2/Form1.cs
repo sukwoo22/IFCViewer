@@ -74,12 +74,31 @@ namespace WindowsFormsApplication2
 
         private void openGLControl1_Resize(object sender, EventArgs e)
         {
-            scene.resize(openGLControl1.Width, openGLControl1.Height);
+            scene.Resize(openGLControl1.Width, openGLControl1.Height);
         }
 
         private void openGLControl1_MouseWheel(object sender, MouseEventArgs e)
         {
             scene.Zoom(e.Delta);
+        }
+
+        private void openGLControl1_MouseMove(object sender, MouseEventArgs e)
+        {
+            switch (e.Button)
+            {
+                case System.Windows.Forms.MouseButtons.Right:
+                    {
+                        break;
+                    }
+
+                case System.Windows.Forms.MouseButtons.Middle:
+                    {
+                        scene.Pan(e.Location.X, e.Location.Y);
+                        break;
+                    }
+                default:
+                    break;
+            }
         }
         
     }

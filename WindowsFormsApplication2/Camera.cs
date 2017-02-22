@@ -31,7 +31,7 @@ namespace IFCViewer
         private float cameraDistance = 1.0f;
        
         // 이동 계수
-        private float moveCoef = 1.0f;
+        private float moveFactor = 1.0f;
 
         // 카메라가 바라보는 목표
         private vec3 pCenter;
@@ -96,6 +96,18 @@ namespace IFCViewer
         }
         #endregion
 
+        private void CalculateMoveFactor()
+        {
+            vec3 temp = pCenter - pEye;
+
+            float currentDistance = (float)Math.Sqrt((double)VecMath.vec3Dot(temp, temp));
+
+            if (currentDistance / cameraDistance < 0.005f) currentDistance = 0.005f * cameraDistance;
+
+            moveFactor = 0.4f * currentDistance;
+        }
+
+
         // 카메라 파라미터 및 뷰 행렬 생성
         public mat4 LookAt(vec3 eye, vec3 target, vec3 u)
         {
@@ -140,22 +152,6 @@ namespace IFCViewer
             return matProj;
         }
 
-
-        public void updateCoef()
-        {
-            vec3 temp = pCenter - pEye;
-
-            float currentDistance = (float)Math.Sqrt((double)VecMath.vec3Dot(temp, temp));
-
-            if (currentDistance / cameraDistance < 0.01f) currentDistance = 0.01f * cameraDistance;
-
-            if (currentDistance > cameraDistance) currentDistance = cameraDistance;
-
-            moveCoef = 0.4f * currentDistance;
-
-        }
-
-
         // 뷰 행렬 업데이트
         public void UpdateViewMatrix()
         {
@@ -186,21 +182,27 @@ namespace IFCViewer
         // 좌우 이동
         public void Strafe(float d)
         {
-            pEye += -0.3f * moveCoef * d * vSide;
+            CalculateMoveFactor();
+
+            pEye += - 0.007f * moveFactor * d * vSide;
         }
 
         // 상하 이동
         public void Zump(float d)
         {
-            pEye += 0.3f * moveCoef * d * vUp;
+            CalculateMoveFactor();
+
+            pEye += 0.007f * moveFactor * d * vUp;
         }
 
         // 앞뒤 이동
         public void Walk(float d)
         {
+            CalculateMoveFactor();
+
             vec3 prevHead = pCenter - pEye; 
 
-            pEye += 1.0f * moveCoef * d * vLook;
+            pEye += 1.0f * moveFactor * d * vLook;
 
             vec3 currHead = pCenter - pEye;
 
@@ -253,7 +255,6 @@ namespace IFCViewer
 
             // 센터를 기준으로 가장 멀리 떨어진 거리
             float maxDistance = max - center + offset;
-
 
             float d = maxDistance / (float)Math.Tan(0.5 * (double)theta);
 

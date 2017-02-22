@@ -1,6 +1,5 @@
 ﻿#version 430 core
 
-
 in VSOUT
 {
 	vec3 n;

@@ -19,10 +19,11 @@ namespace IFCViewer
         private mat4 matView;
         private mat4 matWorld;
 
+        // 쉐이더 입력 데이터 인덱스
         private const uint attributeIndexPosition = 0;
         private const uint attributeIndexNormal = 1;
 
-        // 버텍스와 픽셀 쉐이더에 대한 쉐이더 프로그램
+        // 쉐이더 객체
         private ShaderProgram shaderProgram;
 
         private float rads = 0.25f * (float)Math.PI;
@@ -30,7 +31,9 @@ namespace IFCViewer
         // 화면 너비/높이
         private float width = 0.0f;
         private float height = 0.0f;
-
+        
+        // 씬 중심
+        vec3 sceneCenter;
 
         // 조명
         struct LIGHT
@@ -50,6 +53,14 @@ namespace IFCViewer
         private IFCViewerWrapper ifcParser = IFCViewerWrapper.Instance;
         private List<IFCItem> modelList = new List<IFCItem>();
         private Camera camera = Camera.Instance;
+
+        // 팬 관련 변수
+        private int prevMouseX = 0;
+        private int prevMouseY = 0;
+        private float prevPanTime = 0.0f;
+
+        // 타이머
+        private System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
 
 
         #region 내부 함수
@@ -225,10 +236,11 @@ namespace IFCViewer
             // 조명 설정
             SetupLights(gl);
 
-
+            sw.Reset();
+            sw.Start();
         }
         
-        public void resize(float w, float h)
+        public void Resize(float w, float h)
         {
             width = w;
             height = h;
@@ -319,7 +331,9 @@ namespace IFCViewer
             bool initMinMax = false;
             GetDimensions(ref min, ref max, ref initMinMax);
 
-            camera.Center = new vec3((max.x + min.x) / 2f, (max.y + min.y) / 2f, (max.z + min.z) / 2f);
+            sceneCenter = new vec3((max.x + min.x) / 2f, (max.y + min.y) / 2f, (max.z + min.z) / 2f);
+
+            camera.Center = sceneCenter;
 
             float size = max.x - min.x;
 
@@ -392,7 +406,7 @@ namespace IFCViewer
                 vSize += sizeof(float) * (int)modelList[i].verticesForFaces.Length;
                 pinnedVertexArray.Free();
             }
-
+            
             gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, sizeof(float) * 6, IntPtr.Zero);
             gl.EnableVertexAttribArray(attributeIndexPosition);
             gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, sizeof(float) * 6, IntPtr.Add(IntPtr.Zero, sizeof(float) * 3));
@@ -418,7 +432,6 @@ namespace IFCViewer
 
         public void Update()
         {
-            camera.updateCoef();
             camera.UpdateViewMatrix();
             matView = camera.MatView;
         }
@@ -500,14 +513,40 @@ namespace IFCViewer
         }
         #endregion
 
+        #region 카메라 제어 함수 
         public void Zoom(int delta)
         {
-
             float d = 0.0f;
             if (delta > 0) d = -1.0f;
             if (delta < 0) d = 1.0f;
 
             camera.Walk(d);
         }
+
+        public void Pan(int x, int y)
+        {
+            // 팬기능이 이전 팬기능보다 시간이 지나서 활성화되면 이전 마우스 위치를 초기화 시킨다.
+            // 갑자기 너무 많이 이동하는 것을 방지한다.
+            float currTime = sw.ElapsedMilliseconds / 1000.0f;
+            if(currTime - prevPanTime > 0.1f)
+            {
+                prevMouseX = x;
+                prevMouseY = y;
+            }
+
+            // 변위
+            float distX = (float)(x - prevMouseX) * 275.0f / height;
+            float distY = (float)(y - prevMouseY) * 275.0f / height;
+
+            camera.Strafe(distX);
+            camera.Zump(distY);
+
+            prevMouseX = x;
+            prevMouseY = y;
+
+            prevPanTime = currTime;
+        }
+
+        #endregion
     }
 }
