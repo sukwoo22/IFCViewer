@@ -50,10 +50,6 @@ namespace IFCViewer
         private LIGHT light2 = new LIGHT();
         private LIGHT light3 = new LIGHT();
 
-        private IFCViewerWrapper ifcParser = IFCViewerWrapper.Instance;
-        private List<IFCItem> modelList = new List<IFCItem>();
-        private Camera camera = Camera.Instance;
-
         // 팬 관련 변수
         private int prevMouseX = 0;
         private int prevMouseY = 0;
@@ -61,6 +57,10 @@ namespace IFCViewer
 
         // 타이머
         private System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+        private IFCViewerWrapper ifcParser = IFCViewerWrapper.Instance;
+        private List<IFCItem> modelList = new List<IFCItem>();
+        private Camera camera = Camera.Instance;
+
 
 
         #region 내부 함수
@@ -238,8 +238,10 @@ namespace IFCViewer
 
             sw.Reset();
             sw.Start();
+
         }
-        
+        private uint[] textures = new uint[1];
+
         public void Resize(float w, float h)
         {
             width = w;
@@ -429,7 +431,6 @@ namespace IFCViewer
             #endregion
         }
 
-
         public void Update()
         {
             camera.UpdateViewMatrix();
@@ -447,6 +448,10 @@ namespace IFCViewer
             gl.Enable(OpenGL.GL_DEPTH_TEST);
             gl.DepthFunc(OpenGL.GL_LEQUAL);
 
+            gl.Enable(OpenGL.GL_BLEND);
+            gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
+            gl.Enable(OpenGL.GL_LINE_SMOOTH);
+            
 
             shaderProgram.Bind(gl);
             shaderProgram.SetUniformMatrix4(gl, "matProj", matProj.to_array());
@@ -525,7 +530,7 @@ namespace IFCViewer
 
         public void Pan(int x, int y)
         {
-            // 팬기능이 이전 팬기능보다 시간이 지나서 활성화되면 이전 마우스 위치를 초기화 시킨다.
+            // 팬기능이 이전 보다 훨씬 시간이 지나서 활성화되면 이전 마우스 위치를 초기화 시킨다.
             // 갑자기 너무 많이 이동하는 것을 방지한다.
             float currTime = sw.ElapsedMilliseconds / 1000.0f;
             if(currTime - prevPanTime > 0.1f)
@@ -547,6 +552,28 @@ namespace IFCViewer
             prevPanTime = currTime;
         }
 
+        public void FreeOrbit(int x, int y)
+        {
+            float currTime = sw.ElapsedMilliseconds / 1000.0f;
+            if (currTime - prevPanTime > 0.1f)
+            {
+                prevMouseX = x;
+                prevMouseY = y;
+            }
+
+            // 변위
+            float distX = -0.005f * (float)(x - prevMouseX) * 0.9f;
+            float distY = -0.005f * (float)(y - prevMouseY) * 0.9f;
+
+            camera.OrbitUp(distX);
+            camera.OrbitSide(distY);
+
+            prevMouseX = x;
+            prevMouseY = y;
+
+            prevPanTime = currTime; 
+
+        }
         #endregion
     }
 }

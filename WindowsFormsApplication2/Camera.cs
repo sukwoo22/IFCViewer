@@ -185,6 +185,8 @@ namespace IFCViewer
             CalculateMoveFactor();
 
             pEye += - 0.007f * moveFactor * d * vSide;
+
+            pCenter += - 0.007f * moveFactor * d * vSide;
         }
 
         // 상하 이동
@@ -193,6 +195,8 @@ namespace IFCViewer
             CalculateMoveFactor();
 
             pEye += 0.007f * moveFactor * d * vUp;
+
+            pCenter += 0.007f * moveFactor * d * vUp;
         }
 
         // 앞뒤 이동
@@ -200,15 +204,17 @@ namespace IFCViewer
         {
             CalculateMoveFactor();
 
-            vec3 prevHead = pCenter - pEye; 
+            vec3 prevHead = pCenter - pEye;
+            prevHead = glm.normalize(prevHead);
 
-            pEye += 1.0f * moveFactor * d * vLook;
+            pEye += -1.0f * moveFactor * d * prevHead;
 
             vec3 currHead = pCenter - pEye;
+            currHead = glm.normalize(currHead);
 
             if(VecMath.vec3Dot(prevHead, currHead) < 0.9999)
             {
-                pEye = vLook + pCenter;
+                pCenter = -0.01f * cameraDistance * vLook + pCenter;
             }
 
         }
@@ -236,9 +242,46 @@ namespace IFCViewer
             vSide = glm.cross(vUp, vLook);
         }
 
-        public void ObitY(float angle, vec3 center)
+        public void OrbitUp(float angle)
         {
 
+            pEye -= pCenter;
+
+            vec3 y = new vec3(0.0f, 0.0f, 1.0f);
+
+            mat4 r = glm.rotate(new mat4(1.0f), angle, y);
+
+            VecMath.vec3TransformCoord(ref pEye, ref r);
+
+            pEye += pCenter;
+
+            vLook = pEye - pCenter;
+            vLook = glm.normalize(vLook);
+
+            VecMath.vec3TransformNormal(ref vSide, ref r);
+            vSide = glm.normalize(vSide);
+
+            vUp = glm.cross(vLook, vSide);
+            
+        }
+
+        public void OrbitSide(float angle)
+        {
+            pEye -= pCenter;
+
+            mat4 r = glm.rotate(new mat4(1.0f), angle, vSide);
+
+            VecMath.vec3TransformCoord(ref pEye, ref r);
+
+            pEye += pCenter;
+
+            vLook = pEye - pCenter;
+            vLook = glm.normalize(vLook);
+
+            VecMath.vec3TransformNormal(ref vUp, ref r);
+            vUp = glm.normalize(vUp);
+
+            vSide = glm.cross(vUp, vLook);
 
         }
 

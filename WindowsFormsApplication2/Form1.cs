@@ -88,6 +88,7 @@ namespace WindowsFormsApplication2
             {
                 case System.Windows.Forms.MouseButtons.Right:
                     {
+                        scene.FreeOrbit(e.Location.X, e.Location.Y);
                         break;
                     }
 

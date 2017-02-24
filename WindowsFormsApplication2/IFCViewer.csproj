@@ -77,20 +77,25 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="C1.Win.C1InputPanel.2, Version=2.0.20161.147, Culture=neutral, PublicKeyToken=79882d576c6336da, processorArchitecture=MSIL" />
-    <Reference Include="GlmNet">
-      <HintPath>D:\이석우 백업\업무\SharpGL\YT.SGL.Viewer\YT.SGL.TEST_SW\SharpGL DLL\GlmNet.dll</HintPath>
+    <Reference Include="GlmNet, Version=0.0.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>D:\이석우 백업\업무\SharpGL\CoreDLL\SharpGL 2.3\GlmNet.dll</HintPath>
     </Reference>
-    <Reference Include="SharpGL">
-      <HintPath>D:\이석우 백업\업무\SharpGL\YT.SGL.Viewer\YT.SGL.TEST_SW\SharpGL DLL\SharpGL.dll</HintPath>
+    <Reference Include="SharpGL, Version=2.4.0.0, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>D:\이석우 백업\업무\SharpGL\CoreDLL\SharpGL 2.3\SharpGL.dll</HintPath>
     </Reference>
-    <Reference Include="SharpGL.SceneGraph">
-      <HintPath>D:\이석우 백업\업무\SharpGL\YT.SGL.Viewer\YT.SGL.TEST_SW\SharpGL DLL\SharpGL.SceneGraph.dll</HintPath>
+    <Reference Include="SharpGL.SceneGraph, Version=2.4.0.0, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>D:\이석우 백업\업무\SharpGL\CoreDLL\SharpGL 2.3\SharpGL.SceneGraph.dll</HintPath>
     </Reference>
-    <Reference Include="SharpGL.Serialization">
-      <HintPath>D:\이석우 백업\업무\SharpGL\YT.SGL.Viewer\YT.SGL.TEST_SW\SharpGL DLL\SharpGL.Serialization.dll</HintPath>
+    <Reference Include="SharpGL.Serialization, Version=2.4.0.0, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>D:\이석우 백업\업무\SharpGL\CoreDLL\SharpGL 2.3\SharpGL.Serialization.dll</HintPath>
     </Reference>
-    <Reference Include="SharpGL.WinForms">
-      <HintPath>D:\이석우 백업\업무\SharpGL\YT.SGL.Viewer\YT.SGL.TEST_SW\SharpGL DLL\SharpGL.WinForms.dll</HintPath>
+    <Reference Include="SharpGL.WinForms, Version=2.3.0.1, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>D:\이석우 백업\업무\SharpGL\CoreDLL\SharpGL 2.3\SharpGL.WinForms.dll</HintPath>
     </Reference>
     <Reference Include="System">
       <Private>False</Private>

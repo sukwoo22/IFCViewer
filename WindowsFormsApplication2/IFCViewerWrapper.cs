@@ -430,10 +430,11 @@ namespace IFCViewer
                 mask += IfcEngine.x64.flagbit8;        //    TRIANGLES
                 mask += IfcEngine.x64.flagbit12;       //    WIREFRAME
               
-                setting += 0;		     //    SINGLE PRECISION (float)
+                setting += 0;		                   //    SINGLE PRECISION (float)
+                setting += 0;                          //    32 BIT INDEX ARRAY (Int32)
                 setting += IfcEngine.x64.flagbit5;     //    NORMALS ON
                 setting += IfcEngine.x64.flagbit8;     //    TRIANGLES ON
-                setting += 0;			 //    WIREFRAME OFF 
+                setting += 0;			               //    WIREFRAME OFF 
                 IfcEngine.x64.setFormat(ifcModel, setting, mask);
 
                 GenerateFacesGeometry(ifcModel, ifcItemList[i]);
@@ -519,15 +520,27 @@ namespace IFCViewer
                     }
 
                     // C++ => getRGB_shapeRepresentation()
-                    IntPtr representationIdentifier;
+                    IntPtr representationIdentifier, representationType;
                     IfcEngine.x64.sdaiGetAttrBN(iShapeInstance, "RepresentationIdentifier", IfcEngine.x64.sdaiSTRING, out representationIdentifier);
+                    IfcEngine.x64.sdaiGetAttrBN(iShapeInstance, "RepresentationType", IfcEngine.x64.sdaiSTRING, out representationType);
 
-                    if (Marshal.PtrToStringAnsi(representationIdentifier) == "Body")
+                    string represenIdentifier = Marshal.PtrToStringAnsi(representationIdentifier);
+                    string represenType = Marshal.PtrToStringAnsi(representationType);
+
+                    if (represenIdentifier == "Body" || represenIdentifier == "Mesh" || represenType != "BoundingBox") 
                     {
                         IntPtr itemsInstance;
                         IfcEngine.x64.sdaiGetAttrBN(iShapeInstance, "Items", IfcEngine.x64.sdaiAGGR, out itemsInstance);
 
+                        long temp;
+                        IfcEngine.x64.sdaiGetAttrBN(iShapeInstance, "Items", IfcEngine.x64.sdaiAGGR, out temp);
+
+
                         Int64 iItemsCount = IfcEngine.x64.sdaiGetMemberCount(itemsInstance.ToInt64());
+                        long check = itemsInstance.ToInt64();
+                        int check2 = itemsInstance.ToInt32();
+
+                        long kc = IfcEngine.x64.sdaiGetMemberCount(temp);
                         for (Int64 iItem = 0; iItem < iItemsCount; iItem++)
                         {
                             Int64 iItemInstance = 0;
