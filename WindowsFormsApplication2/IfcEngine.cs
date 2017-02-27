@@ -390,6 +390,27 @@ namespace IfcEngine
 
         [DllImport(IFCEngineDLL, EntryPoint = "getConceptualFaceEx")]
         public static extern Int64 getConceptualFaceEx(Int64 instance, Int64 index, ref Int64 startIndexTriangles, ref Int64 noIndicesTriangles, ref Int64 startIndexLines, ref Int64 noIndicesLines, ref Int64 startIndexPoints, ref Int64 noIndicesPoints, ref Int64 startIndexFacesPolygons, ref Int64 noIndicesFacesPolygons, ref Int64 startIndexConceptualFacePolygons, ref Int64 noIndicesConceptualFacePolygons);
+
+        [DllImport(IFCEngineDLL, EntryPoint = "GetInstanceClass")]
+        public static extern Int64 GetInstanceClass(Int64 instance);
+
+        [DllImport(IFCEngineDLL, EntryPoint = "GetClassByName")]
+        public static extern Int64 GetClassByName(Int64 model, string name);
+
+        [DllImport(IFCEngineDLL, EntryPoint = "GetPropertyByName")]
+        public static extern Int64 GetPropertyByName(Int64 model, string rdfPropertyName);
+
+        [DllImport(IFCEngineDLL, EntryPoint = "GetObjectTypeProperty")]
+        public static extern Int64 GetObjectTypeProperty(Int64 owlInstance, Int64 rdfProperty, out Int64 value, out Int64 card);
+
+        [DllImport(IFCEngineDLL, EntryPoint = "GetObjectTypeProperty")]
+        public static extern Int64 GetObjectTypeProperty(Int64 owlInstance, Int64 rdfProperty, out IntPtr value, out IntPtr card);
+
+        [DllImport(IFCEngineDLL, EntryPoint = "CalculateInstance")]
+        public static extern Int64 CalculateInstance(Int64 owlInstance, out Int64 vertexBufferSize, out Int64 indexBufferSize, out Int64 transformationBufferSize);
+
+        [DllImport(IFCEngineDLL, EntryPoint = "CalculateInstance")]
+        public static extern Int64 CalculateInstance(Int64 owlInstance, out IntPtr vertexBufferSize, out IntPtr indexBufferSize, out IntPtr transformationBufferSize);
     }
 
     class x86

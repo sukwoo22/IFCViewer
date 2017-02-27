@@ -16,7 +16,7 @@ using SharpGL.VertexBuffers;
 
 namespace IFCViewer
 {
-    struct Material
+    class Material
     {
 
         public vec3 ambient;
@@ -25,7 +25,9 @@ namespace IFCViewer
         public vec3 emissive;
         public float transparency;
         public float power;
-               
+        public bool active;
+        public long indexArrayOffset;
+        public long indexArrayPrimitives;
     }
 
     class IFCItem
@@ -41,7 +43,7 @@ namespace IFCViewer
             this.ifcType = ifcType;
             this.description = desc;
             this.name = name;
-            this.isActiveMaterial = false;
+            this.materialList = new List<Material>();
         }
 
         public int ifcIDx86 = 0;
@@ -75,8 +77,8 @@ namespace IFCViewer
         public int[] indicesForWireFrameLineParts;
         public Int64 vertexOffsetForWireFrame;
         public Int64 indexOffsetForWireFrame;
-        public bool isActiveMaterial;
-        public Material material; 
+        public Material material;
+        public List<Material> materialList;
 
         public IFCTreeItem ifcTreeItem = null;
     }
@@ -439,10 +441,9 @@ namespace IFCViewer
 
                 GenerateFacesGeometry(ifcModel, ifcItemList[i]);
 
-                CreateMaterial(ifcItemList[i]);
-
                 IfcEngine.x64.cleanMemory(ifcModel, 0);
 
+                
             }
         }
        
@@ -462,6 +463,9 @@ namespace IFCViewer
                     ifcItem.indicesForFaces = new int[noIndices];
 
                     IfcEngine.x64.finalizeModelling(ifcModel, ifcItem.verticesForFaces, ifcItem.indicesForFaces, 0);
+
+                    CreateMaterial(ifcItem);
+
                    
                 }
             }
@@ -558,20 +562,39 @@ namespace IFCViewer
                                 searchDeeper(item, iItemInstance);
                             } // else if (iItemInstance != 0)
 
-                            if (item.isActiveMaterial)
-                            {
-                                return;
-                            }
                         } // for (int iItem = ...
                     }
                 } // for (int iRepresentation = ...
 
-                if(item.isActiveMaterial == false)
+                // 재질이 없는 경우 -> 기본 재질을 사용
+                if(item.materialList.Count == 0)
                 {
-                    item.material = new Material();
-                    item.material.ambient = item.material.diffuse = item.material.specular = new vec3(0.8f, 0.8f, 0.8f);
-                    item.material.transparency = 1.0f;
+                    Material material = new Material();
+                    material.ambient = material.diffuse = material.specular = new vec3(0.8f, 0.8f, 0.8f);
+                    material.transparency = 1.0f;
+
+                    Int64 vertexBufferSize = 0, indexBufferSize = 0, transformationBufferSize =0; 
+                    IfcEngine.x64.CalculateInstance(item.ifcID, out vertexBufferSize, out indexBufferSize, out transformationBufferSize);
+                    material.indexArrayOffset = 0;
+                    material.indexArrayPrimitives = indexBufferSize / 3;
+                    item.materialList.Add(material);
                 }
+
+                // 재질이 하나만 있는 경우
+                else if(item.materialList.Count == 1)
+                {
+                     Int64 vertexBufferSize = 0, indexBufferSize = 0, transformationBufferSize =0; 
+                     IfcEngine.x64.CalculateInstance(item.ifcID, out vertexBufferSize, out indexBufferSize, out transformationBufferSize);
+                     item.materialList[0].indexArrayOffset = 0;
+                     item.materialList[0].indexArrayPrimitives = indexBufferSize / 3;
+                }
+                
+                // 재질이 하나 이상일 경우
+                else
+                {
+                     walkThroughGeometryTransformation(item);
+                }
+               
             }
         }
 
@@ -583,11 +606,11 @@ namespace IFCViewer
 
             if (styledByItem != IntPtr.Zero)
             {
-                getRGB_styledItem(item, styledByItem.ToInt64());
-                if (item.isActiveMaterial)
+                if(getRGB_styledItem(item, styledByItem.ToInt64()))
                 {
                     return;
                 }
+                
             }
 
             if (IsInstanceOf(iParentInstance, "IFCBOOLEANCLIPPINGRESULT"))
@@ -637,11 +660,7 @@ namespace IFCViewer
                                 {
                                     searchDeeper(item, iItemInstance);
                                 } // else if (iItemInstance != 0)
-
-                                if (item.isActiveMaterial)
-                                {
-                                    return;
-                                }
+                               
                             } // for (int iItem = ...
                         } // if (Marshal.PtrToStringAnsi(representationIdentifier) == "Body")
                     } // if (mappedRepresentation != IntPtr.Zero)
@@ -660,12 +679,17 @@ namespace IFCViewer
         }        
 
 
-        private void getRGB_styledItem(IFCItem item, Int64 iStyledByItemInstance)
+        private bool getRGB_styledItem(IFCItem item, Int64 iStyledByItemInstance)
         {
             IntPtr stylesInstance;
             IfcEngine.x64.sdaiGetAttrBN(iStyledByItemInstance, "Styles", IfcEngine.x64.sdaiAGGR, out stylesInstance);
 
             Int64 iStylesCount = IfcEngine.x64.sdaiGetMemberCount(stylesInstance.ToInt64());
+
+            Int64 prevCount = item.materialList.Count;
+
+            bool isCreatingMaterial = false;
+
             for (Int64 iStyle = 0; iStyle < iStylesCount; iStyle++)
             {
                 Int64 iStyleInstance = 0;
@@ -677,7 +701,15 @@ namespace IFCViewer
                 }
 
                 getRGB_presentationStyleAssignment(item, iStyleInstance);
+
             } // for (int iStyle = ...
+
+            if(item.materialList.Count > prevCount)
+            {
+                isCreatingMaterial = true;
+            }
+
+            return isCreatingMaterial;
         }
 
 
@@ -699,6 +731,7 @@ namespace IFCViewer
 
                 getRGB_surfaceStyle(item, iStyleInstance);
             } // for (int iStyle = ...
+
         }
 
         private unsafe void getRGB_surfaceStyle(IFCItem item, Int64 iParentInstance)
@@ -737,14 +770,66 @@ namespace IFCViewer
                 double B = 0;
                 IfcEngine.x64.sdaiGetAttrBN(surfaceColour.ToInt64(), "Blue", IfcEngine.x64.sdaiREAL, out *(IntPtr*)&B);
 
-                item.material = new Material();
-                item.material.transparency = 1 - (float)transparency;
-                item.isActiveMaterial = true;
-                item.material.ambient = item.material.diffuse = item.material.specular = new vec3((float)R, (float)G, (float)B);
-                item.material.emissive = new vec3((float)R * 0.5f, (float)G * 0.5f, (float)B * 0.5f);
+                Material material = new Material();
+                material.transparency = 1 - (float)transparency;
+                material.ambient = material.diffuse = material.specular = new vec3((float)R, (float)G, (float)B);
+                material.emissive = new vec3((float)R * 0.5f, (float)G * 0.5f, (float)B * 0.5f);
 
-                return;
+                item.materialList.Add(material);
+
+                
             } // for (int iStyle = ...
+
         }
+
+        private void walkThroughGeometryTransformation(IFCItem item)
+        {
+
+            Int64 rdfClassTransformation = IfcEngine.x64.GetClassByName(ifcModel, "Transformation");
+            Int64 instanceClass = IfcEngine.x64.GetInstanceClass(item.ifcID);
+            Int64 owlObjectTypePropertyObject = IfcEngine.x64.GetPropertyByName(ifcModel, "object");
+            Int64 owlInstanceObject = 0, objectCard = 0;
+            IntPtr obCard = IntPtr.Zero;
+            IntPtr inObject = IntPtr.Zero;
+
+            IfcEngine.x64.GetObjectTypeProperty(item.ifcID, owlObjectTypePropertyObject, out inObject, out obCard);
+            owlInstanceObject = inObject.ToInt64();
+            objectCard = obCard.ToInt64();
+
+            if(objectCard == 1)
+            {
+                walkThroughGeometryCollection(owlInstanceObject, item);
+            }
+
+        }
+
+        private void walkThroughGeometryCollection(Int64 owlInstance, IFCItem item)
+        {
+            Int64 rdfClassCollection = IfcEngine.x64.GetClassByName(ifcModel, "Collection");
+            Int64 owlObjectTypePropertyObjects = IfcEngine.x64.GetPropertyByName(ifcModel, "objects");
+
+            Int64 temp1 = IfcEngine.x64.GetInstanceClass(owlInstance);
+
+            if( temp1 == rdfClassCollection)
+            {
+                Int64 owlInstanceObjects = 0, objectsCard = 0;
+                IfcEngine.x64.GetObjectTypeProperty(owlInstance, owlObjectTypePropertyObjects, out owlInstanceObjects, out objectsCard);
+                for(Int64 i = 0; i < objectsCard; ++i)
+                {
+                   
+                }
+
+            }
+            else
+            {
+                
+            }
+        }
+
+        private void walkThroughGeometryObject(Int64 owlInstance, IFCItem item)
+        {
+
+        }
+
     }
 }
