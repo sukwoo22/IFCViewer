@@ -406,11 +406,18 @@ namespace IfcEngine
         [DllImport(IFCEngineDLL, EntryPoint = "GetObjectTypeProperty")]
         public static extern Int64 GetObjectTypeProperty(Int64 owlInstance, Int64 rdfProperty, out IntPtr value, out IntPtr card);
 
+        [DllImport(IFCEngineDLL, EntryPoint = "GetObjectTypeProperty")]
+        public unsafe static extern Int64 GetObjectTypeProperty(Int64 owlInstance, Int64 rdfProperty, Int64** value, Int64* card);
+
         [DllImport(IFCEngineDLL, EntryPoint = "CalculateInstance")]
         public static extern Int64 CalculateInstance(Int64 owlInstance, out Int64 vertexBufferSize, out Int64 indexBufferSize, out Int64 transformationBufferSize);
 
         [DllImport(IFCEngineDLL, EntryPoint = "CalculateInstance")]
         public static extern Int64 CalculateInstance(Int64 owlInstance, out IntPtr vertexBufferSize, out IntPtr indexBufferSize, out IntPtr transformationBufferSize);
+
+        [DllImport(IFCEngineDLL, EntryPoint = "GetDataTypeProperty")]
+        public unsafe static extern Int64 GetDataTypeProperty(Int64 owlInstance, Int64 rdfProperty, Int64** value, Int64* card);
+
     }
 
     class x86
