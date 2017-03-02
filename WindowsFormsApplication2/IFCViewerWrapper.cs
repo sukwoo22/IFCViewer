@@ -44,6 +44,7 @@ namespace IFCViewer
             this.description = desc;
             this.name = name;
             this.materialList = new List<Material>();
+            this.itemInstances = new List<Int64>();
         }
 
         public int ifcIDx86 = 0;
@@ -65,7 +66,7 @@ namespace IFCViewer
         public IFCItem next = null;
         public IFCItem child = null;
         public Int64 noVerticesForFaces;
-        public Int64 noPrimitivesForFaces;
+        public Int64 noIndicesForFaces;
         public float[] verticesForFaces;
         public int[] indicesForFaces;
         public Int64 vertexOffsetForFaces;
@@ -79,6 +80,7 @@ namespace IFCViewer
         public Int64 indexOffsetForWireFrame;
         public Material material;
         public List<Material> materialList;
+        public List<Int64> itemInstances;
 
         public IFCTreeItem ifcTreeItem = null;
     }
@@ -458,7 +460,7 @@ namespace IFCViewer
                 {
 
                     ifcItem.noVerticesForFaces = noVertices;
-                    ifcItem.noPrimitivesForFaces = noIndices / 3;
+                    ifcItem.noIndicesForFaces = noIndices;
                     ifcItem.verticesForFaces = new float[6 * noVertices];
                     ifcItem.indicesForFaces = new int[noIndices];
 
@@ -524,46 +526,7 @@ namespace IFCViewer
                     }
 
                     // C++ => getRGB_shapeRepresentation()
-                    IntPtr representationIdentifier, representationType;
-                    IfcEngine.x64.sdaiGetAttrBN(iShapeInstance, "RepresentationIdentifier", IfcEngine.x64.sdaiSTRING, out representationIdentifier);
-                    IfcEngine.x64.sdaiGetAttrBN(iShapeInstance, "RepresentationType", IfcEngine.x64.sdaiSTRING, out representationType);
-
-                    string represenIdentifier = Marshal.PtrToStringAnsi(representationIdentifier);
-                    string represenType = Marshal.PtrToStringAnsi(representationType);
-
-                    if (represenIdentifier == "Body" || represenIdentifier == "Mesh" || represenType != "BoundingBox")
-                    {
-                        IntPtr itemsInstance;
-                        IfcEngine.x64.sdaiGetAttrBN(iShapeInstance, "Items", IfcEngine.x64.sdaiAGGR, out itemsInstance);
-
-                        long temp;
-                        IfcEngine.x64.sdaiGetAttrBN(iShapeInstance, "Items", IfcEngine.x64.sdaiAGGR, out temp);
-
-
-                        Int64 iItemsCount = IfcEngine.x64.sdaiGetMemberCount(itemsInstance.ToInt64());
-                        long check = itemsInstance.ToInt64();
-                        int check2 = itemsInstance.ToInt32();
-
-                        long kc = IfcEngine.x64.sdaiGetMemberCount(temp);
-                        for (Int64 iItem = 0; iItem < iItemsCount; iItem++)
-                        {
-                            Int64 iItemInstance = 0;
-                            IfcEngine.x64.engiGetAggrElement(itemsInstance.ToInt64(), iItem, IfcEngine.x64.sdaiINSTANCE, out iItemInstance);
-
-                            IntPtr styledByItem;
-                            IfcEngine.x64.sdaiGetAttrBN(iItemInstance, "StyledByItem", IfcEngine.x64.sdaiINSTANCE, out styledByItem);
-
-                            if (styledByItem != IntPtr.Zero)
-                            {
-                                getRGB_styledItem(item, styledByItem.ToInt64(), iItemInstance);
-                            }
-                            else
-                            {
-                                searchDeeper(item, iItemInstance);
-                            } // else if (iItemInstance != 0)
-
-                        } // for (int iItem = ...
-                    }
+                    getRGB_shapeRepresentation(iShapeInstance, item);
                 } // for (int iRepresentation = ...
 
                 // 재질이 없는 경우 -> 기본 재질을 사용
@@ -598,6 +561,43 @@ namespace IFCViewer
             }
         }
 
+        private void getRGB_shapeRepresentation(Int64 ifcShapeRepresentationInstance, IFCItem item)
+        {
+            IntPtr representationIdentifier, representationType;
+            IfcEngine.x64.sdaiGetAttrBN(ifcShapeRepresentationInstance, "RepresentationIdentifier", IfcEngine.x64.sdaiSTRING, out representationIdentifier);
+            IfcEngine.x64.sdaiGetAttrBN(ifcShapeRepresentationInstance, "RepresentationType", IfcEngine.x64.sdaiSTRING, out representationType);
+
+            string represenIdentifier = Marshal.PtrToStringAnsi(representationIdentifier);
+            string represenType = Marshal.PtrToStringAnsi(representationType);
+
+            if (represenIdentifier == "Body" || represenIdentifier == "Mesh" || represenType != "BoundingBox")
+            {
+                IntPtr itemsInstance;
+                IfcEngine.x64.sdaiGetAttrBN(ifcShapeRepresentationInstance, "Items", IfcEngine.x64.sdaiAGGR, out itemsInstance);
+
+                Int64 iItemsCount = IfcEngine.x64.sdaiGetMemberCount(itemsInstance.ToInt64());
+
+                for (Int64 iItem = 0; iItem < iItemsCount; iItem++)
+                {
+                    Int64 iItemInstance = 0;
+                    IfcEngine.x64.engiGetAggrElement(itemsInstance.ToInt64(), iItem, IfcEngine.x64.sdaiINSTANCE, out iItemInstance);
+
+                    IntPtr styledByItem;
+                    IfcEngine.x64.sdaiGetAttrBN(iItemInstance, "StyledByItem", IfcEngine.x64.sdaiINSTANCE, out styledByItem);
+
+                    if (styledByItem != IntPtr.Zero)
+                    {
+                        getRGB_styledItem(item, styledByItem.ToInt64(), iItemInstance);
+                    }
+                    else
+                    {
+                        searchDeeper(item, iItemInstance);
+                        item.itemInstances.Add(IfcEngine.x64.internalGetP21Line(iItemInstance));
+                    } // else if (iItemInstance != 0)
+
+                } // for (int iItem = ...
+            }
+        }
 
         private void searchDeeper(IFCItem item, Int64 iParentInstance)
         {
@@ -635,34 +635,7 @@ namespace IFCViewer
 
                     if (mappedRepresentation != IntPtr.Zero)
                     {
-                        IntPtr representationIdentifier;
-                        IfcEngine.x64.sdaiGetAttrBN(mappedRepresentation.ToInt64(), "RepresentationIdentifier", IfcEngine.x64.sdaiSTRING, out representationIdentifier);
-
-                        if (Marshal.PtrToStringAnsi(representationIdentifier) == "Body")
-                        {
-                            IntPtr itemsInstance;
-                            IfcEngine.x64.sdaiGetAttrBN(mappedRepresentation.ToInt64(), "Items", IfcEngine.x64.sdaiAGGR, out itemsInstance);
-
-                            Int64 iItemsCount = IfcEngine.x64.sdaiGetMemberCount(itemsInstance.ToInt64());
-                            for (Int64 iItem = 0; iItem < iItemsCount; iItem++)
-                            {
-                                Int64 iItemInstance = 0;
-                                IfcEngine.x64.engiGetAggrElement(itemsInstance.ToInt64(), iItem, IfcEngine.x64.sdaiINSTANCE, out iItemInstance);
-
-                                styledByItem = IntPtr.Zero;
-                                IfcEngine.x64.sdaiGetAttrBN(iItemInstance, "StyledByItem", IfcEngine.x64.sdaiINSTANCE, out styledByItem);
-
-                                if (styledByItem != IntPtr.Zero)
-                                {
-                                    getRGB_styledItem(item, styledByItem.ToInt64(), iItemInstance);
-                                }
-                                else
-                                {
-                                    searchDeeper(item, iItemInstance);
-                                } // else if (iItemInstance != 0)
-
-                            } // for (int iItem = ...
-                        } // if (Marshal.PtrToStringAnsi(representationIdentifier) == "Body")
+                        getRGB_shapeRepresentation(mappedRepresentation.ToInt64(), item);
                     } // if (mappedRepresentation != IntPtr.Zero)
                 } // if (IsInstanceOf(iParentInstance, "IFCMAPPEDITEM"))
             } // else if (IsInstanceOf(iParentInstance, "IFCBOOLEANCLIPPINGRESULT"))
@@ -836,24 +809,80 @@ namespace IFCViewer
                 
                 int i = 0;
 
-                for (i = 0; i < item.materialList.Count; ++i)
+                for (i = 0; i < item.itemInstances.Count; ++i)
                 {
-                    if( item.materialList[i].materialID ==  expressID )
+                    if( item.itemInstances[i] ==  expressID )
                     {
                         break;
                     }
+                        
+        
+                }
 
-                    if(i == item.materialList.Count)
+                // 하위 객체가 있을 경우
+                if( i < item.itemInstances.Count)
+                {
+                    findMaterialInstance(owlInstance, item);                   
+                }
+                // 자신이 하위 객체일 경우
+                {
+                    Int64 vertexBufferSize = 0, indexBufferSize = 0, transformationBufferSize, offset = 0;
+                    IfcEngine.x64.CalculateInstance(owlInstance, out vertexBufferSize, out indexBufferSize, out transformationBufferSize);
+                    
+                    for(int j =0; j< item.materialList.Count; ++j)
                     {
-                        // 
+                        if (item.materialList[j].active == true)
+                        {
+                            offset = item.materialList[j].indexArrayOffset + item.materialList[j].indexArrayPrimitives * 3;
+                            continue;
+                        }
+                        item.materialList[j].active = true;
+                        item.materialList[j].indexArrayOffset = offset;
+                        item.materialList[j].indexArrayPrimitives = indexBufferSize / 3;
+                        break;
+
                     }
                 }
             }
             else
             {
-
+                findMaterialInstance(owlInstance, item);
             }
 
+        }
+
+
+        private unsafe void findMaterialInstance(Int64 owlInstance, IFCItem item)
+        {
+            Int64 rdfClassTransformation = IfcEngine.x64.GetClassByName(ifcModel, "Transformation");
+            Int64 rdfClassCollection = IfcEngine.x64.GetClassByName(ifcModel, "Collection");
+            if (IfcEngine.x64.GetInstanceClass(owlInstance) == rdfClassTransformation)
+            {
+                Int64* owlInstanceObject = null;
+                Int64 objectCard = 0;
+                Int64 owlObjectTypePropertyObject = IfcEngine.x64.GetPropertyByName(ifcModel, "object");
+
+                IfcEngine.x64.GetObjectTypeProperty(owlInstance, owlObjectTypePropertyObject, &owlInstanceObject, &objectCard);
+                if (objectCard == 1)
+                {
+                    walkThroughGeometryObject(owlInstanceObject[0], item);
+                }
+                else
+                {
+                    Debug.Assert(objectCard != 1, "객체 개수가 한개 이상임");
+                }
+            }
+            else if (IfcEngine.x64.GetInstanceClass(owlInstance) == rdfClassCollection)
+            {
+                Int64* owlInstanceObjects = null;
+                Int64 objectsCard = 0;
+                Int64 owlObjectTypePropertyObjects = IfcEngine.x64.GetPropertyByName(ifcModel, "objects");
+                IfcEngine.x64.GetObjectTypeProperty(owlInstance, owlObjectTypePropertyObjects, &owlInstanceObjects, &objectsCard);
+                for (Int64 j = 0; j < objectsCard; ++j)
+                {
+                    walkThroughGeometryObject(owlInstanceObjects[j], item);
+                }
+            }
         }
 
     }

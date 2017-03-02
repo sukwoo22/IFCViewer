@@ -115,19 +115,24 @@ namespace IFCViewer
             if (startIndex != 0)
             {
                 vBuffSize = modelList[startIndex - 1].vertexOffsetForFaces + modelList[startIndex - 1].noVerticesForFaces;
-                iBuffSize = modelList[startIndex - 1].indexOffsetForFaces + 3 * modelList[startIndex - 1].noPrimitivesForFaces;
+                iBuffSize = modelList[startIndex - 1].indexOffsetForFaces + modelList[startIndex - 1].noIndicesForFaces;
             }
 
             for (var i = startIndex; i < modelList.Count; ++i)
             {
 
-                if (modelList[i].ifcID != 0 && modelList[i].noVerticesForFaces != 0 && modelList[i].noPrimitivesForFaces != 0)
+                if (modelList[i].ifcID != 0 && modelList[i].noVerticesForFaces != 0 && modelList[i].noIndicesForFaces != 0)
                 {
                     modelList[i].vertexOffsetForFaces = vBuffSize;
                     modelList[i].indexOffsetForFaces = iBuffSize;
 
+                    for (var j = 0; j < modelList[i].materialList.Count; ++j)
+                    {
+                        modelList[i].materialList[j].indexArrayOffset += iBuffSize;
+                    }
+
                     vBuffSize += modelList[i].noVerticesForFaces;
-                    iBuffSize += 3 * modelList[i].noPrimitivesForFaces;
+                    iBuffSize += modelList[i].noIndicesForFaces;
 
                     if (i == 0) continue;
 
@@ -136,6 +141,8 @@ namespace IFCViewer
                     {
                         modelList[i].indicesForFaces[j] = modelList[i].indicesForFaces[j] + (int)modelList[i].vertexOffsetForFaces;
                     }
+
+                   
 
                 }
             }
@@ -446,16 +453,61 @@ namespace IFCViewer
             gl.FrontFace(OpenGL.GL_CW);
 
             gl.Enable(OpenGL.GL_DEPTH_TEST);
-            gl.DepthFunc(OpenGL.GL_LEQUAL);
+            gl.DepthFunc(OpenGL.GL_LESS);
 
-            gl.Enable(OpenGL.GL_BLEND);
-            gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
-            gl.Enable(OpenGL.GL_LINE_SMOOTH);
+            //gl.Enable(OpenGL.GL_BLEND);
+            //gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
+            //gl.Enable(OpenGL.GL_LINE_SMOOTH);
             
 
             shaderProgram.Bind(gl);
             shaderProgram.SetUniformMatrix4(gl, "matProj", matProj.to_array());
             shaderProgram.SetUniformMatrix4(gl, "matView", matView.to_array());
+            bindingLights(gl);
+            
+           
+            if (modelList.Count != 0)
+            {
+                ifcParser.vertexBufferArray.Bind(gl);
+
+                // 불투명 객체
+                for (var i = 0; i < modelList.Count; ++i)
+                {
+
+                    for (var k = 0; k < modelList[i].materialList.Count; ++k)
+                    {
+                        if (modelList[i].materialList[k].transparency > 0.9999f)
+                        {
+                            bindingMaterials(gl, modelList[i].materialList[k]);
+                            gl.DrawElements(OpenGL.GL_TRIANGLES, 3 * (int)modelList[i].materialList[k].indexArrayPrimitives, OpenGL.GL_UNSIGNED_INT, IntPtr.Add(IntPtr.Zero, sizeof(int) * (int)(modelList[i].materialList[k].indexArrayOffset)));
+                        }
+                    }
+                }
+
+                gl.Enable(OpenGL.GL_BLEND);
+                gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
+
+                // 투명 객체
+                for (var i = 0; i < modelList.Count; ++i)
+                {
+                    for (var k = 0; k < modelList[i].materialList.Count; ++k)
+                    {
+                        if (modelList[i].materialList[k].transparency < 0.9999f)
+                        {
+                            bindingMaterials(gl, modelList[i].materialList[k]);
+                            gl.DrawElements(OpenGL.GL_TRIANGLES, 3 * (int)modelList[i].materialList[k].indexArrayPrimitives, OpenGL.GL_UNSIGNED_INT, IntPtr.Add(IntPtr.Zero, sizeof(int) * (int)(modelList[i].materialList[k].indexArrayOffset)));
+                        }
+                    }
+                }
+                gl.Disable(OpenGL.GL_BLEND);
+                ifcParser.vertexBufferArray.Unbind(gl);
+            }
+
+            shaderProgram.Unbind(gl);
+
+        }
+        private void bindingLights(OpenGL gl)
+        {
             shaderProgram.SetUniform3(gl, "dirLight[0].direction", light1.direction.x, light1.direction.y, light1.direction.z);
             shaderProgram.SetUniform3(gl, "dirLight[0].diffuse", light1.diffuse.x, light1.diffuse.y, light1.diffuse.z);
             shaderProgram.SetUniform3(gl, "dirLight[0].ambient", light1.ambient.x, light1.ambient.y, light1.ambient.z);
@@ -468,54 +520,17 @@ namespace IFCViewer
             shaderProgram.SetUniform3(gl, "dirLight[2].diffuse", light3.diffuse.x, light3.diffuse.y, light3.diffuse.z);
             shaderProgram.SetUniform3(gl, "dirLight[2].ambient", light3.ambient.x, light3.ambient.y, light3.ambient.z);
             shaderProgram.SetUniform3(gl, "dirLight[2].specular", light3.specular.x, light3.specular.y, light3.specular.z);
-            
-           
-            if (modelList.Count != 0)
-            {
-                ifcParser.vertexBufferArray.Bind(gl);
-
-                // 불투명 객체
-                for (var i = 0; i < modelList.Count; ++i)
-                {
-                    if (modelList[i].material.transparency > 0.9999f)
-                    {
-                        shaderProgram.SetUniform3(gl, "material.ambient", modelList[i].material.ambient.x, modelList[i].material.ambient.y, modelList[i].material.ambient.z);
-                        shaderProgram.SetUniform3(gl, "material.diffuse", modelList[i].material.diffuse.x, modelList[i].material.diffuse.y, modelList[i].material.diffuse.z);
-                        shaderProgram.SetUniform3(gl, "material.specular", modelList[i].material.specular.x, modelList[i].material.specular.y, modelList[i].material.specular.z);
-                        shaderProgram.SetUniform3(gl, "material.emissive", modelList[i].material.emissive.x, modelList[i].material.emissive.y, modelList[i].material.emissive.z);
-                        shaderProgram.SetUniform1(gl, "material.transparency", modelList[i].material.transparency);
-                        gl.DrawElements(OpenGL.GL_TRIANGLES, 3 * (int)modelList[i].noPrimitivesForFaces, OpenGL.GL_UNSIGNED_INT, IntPtr.Add(IntPtr.Zero, sizeof(int) * (int)modelList[i].indexOffsetForFaces));
-                    }
-                }
-
-                gl.Enable(OpenGL.GL_BLEND);
-                gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
-
-                // 투명 객체
-                for (var i = 0; i < modelList.Count; ++i)
-                {
-                    if(modelList[i].material.transparency < 0.9999f)
-                    {
-                        shaderProgram.SetUniform3(gl, "material.ambient", modelList[i].material.ambient.x, modelList[i].material.ambient.y, modelList[i].material.ambient.z);
-                        shaderProgram.SetUniform3(gl, "material.diffuse", modelList[i].material.diffuse.x, modelList[i].material.diffuse.y, modelList[i].material.diffuse.z);
-                        shaderProgram.SetUniform3(gl, "material.specular", modelList[i].material.specular.x, modelList[i].material.specular.y, modelList[i].material.specular.z);
-                        shaderProgram.SetUniform3(gl, "material.emissive", modelList[i].material.emissive.x, modelList[i].material.emissive.y, modelList[i].material.emissive.z);
-                        shaderProgram.SetUniform1(gl, "material.transparency", modelList[i].material.transparency);
-                        gl.DrawElements(OpenGL.GL_TRIANGLES, 3 * (int)modelList[i].noPrimitivesForFaces, OpenGL.GL_UNSIGNED_INT, IntPtr.Add(IntPtr.Zero, sizeof(int) * (int)modelList[i].indexOffsetForFaces));
-                    }
-                }
-                gl.Disable(OpenGL.GL_BLEND);
-                ifcParser.vertexBufferArray.Unbind(gl);
-            }
-
-            
-            //ifcParser.vertexBufferArray.Bind(gl);
-            //gl.DrawElements(OpenGL.GL_TRIANGLES, 6, OpenGL.GL_UNSIGNED_INT, IntPtr.Zero);
-            //ifcParser.vertexBufferArray.Unbind(gl);
-
-            shaderProgram.Unbind(gl);
-
         }
+
+        private void bindingMaterials(OpenGL gl, Material material)
+        {
+            shaderProgram.SetUniform3(gl, "material.ambient", material.ambient.x, material.ambient.y, material.ambient.z);
+            shaderProgram.SetUniform3(gl, "material.diffuse", material.diffuse.x, material.diffuse.y, material.diffuse.z);
+            shaderProgram.SetUniform3(gl, "material.specular", material.specular.x, material.specular.y, material.specular.z);
+            shaderProgram.SetUniform3(gl, "material.emissive", material.emissive.x, material.emissive.y, material.emissive.z);
+            shaderProgram.SetUniform1(gl, "material.transparency", material.transparency);
+        }
+
         #endregion
 
         #region 카메라 제어 함수 
