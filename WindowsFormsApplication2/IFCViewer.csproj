@@ -81,15 +81,15 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>D:\이석우 백업\업무\SharpGL\CoreDLL\SharpGL 2.3\GlmNet.dll</HintPath>
     </Reference>
-    <Reference Include="SharpGL, Version=2.4.0.0, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=AMD64">
+    <Reference Include="SharpGL, Version=2.3.0.1, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>D:\이석우 백업\업무\SharpGL\CoreDLL\SharpGL 2.3\SharpGL.dll</HintPath>
     </Reference>
-    <Reference Include="SharpGL.SceneGraph, Version=2.4.0.0, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=AMD64">
+    <Reference Include="SharpGL.SceneGraph, Version=2.3.0.1, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>D:\이석우 백업\업무\SharpGL\CoreDLL\SharpGL 2.3\SharpGL.SceneGraph.dll</HintPath>
     </Reference>
-    <Reference Include="SharpGL.Serialization, Version=2.4.0.0, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=AMD64">
+    <Reference Include="SharpGL.Serialization, Version=2.3.0.1, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>D:\이석우 백업\업무\SharpGL\CoreDLL\SharpGL 2.3\SharpGL.Serialization.dll</HintPath>
     </Reference>

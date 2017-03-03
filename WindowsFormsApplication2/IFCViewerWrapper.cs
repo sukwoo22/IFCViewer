@@ -24,10 +24,10 @@ namespace IFCViewer
         public vec3 specular;
         public vec3 emissive;
         public float transparency;
-        public float power;
         public bool active;
         public long indexArrayOffset;
-        public long indexArrayPrimitives;
+        public long indexArrayCount;
+        public IntPtr indexArrayOffsetSize;
     }
 
     class IFCItem
@@ -47,16 +47,6 @@ namespace IFCViewer
             this.itemInstances = new List<Int64>();
         }
 
-        public int ifcIDx86 = 0;
-        public int noVerticesForFacesx86;
-        public int noPrimitivesForFacesx86;
-        public int vertexOffsetForFacesx86;
-        public int indexOffsetForFacesx86;
-        public int noVerticesForWireFramex86;
-        public int noPrimitivesForWireFramex86;
-        public int vertexOffsetForWireFramex86;
-        public int indexOffsetForWireFramex86;
-
         public Int64 ifcID = 0;
         public string globalID;
         public string ifcType;
@@ -71,14 +61,6 @@ namespace IFCViewer
         public int[] indicesForFaces;
         public Int64 vertexOffsetForFaces;
         public Int64 indexOffsetForFaces;
-        public Int64 noVerticesForWireFrame;
-        public Int64 noPrimitivesForWireFrame;
-        public float[] verticesForWireFrame;
-        public int[] indicesForWireFrame;
-        public int[] indicesForWireFrameLineParts;
-        public Int64 vertexOffsetForWireFrame;
-        public Int64 indexOffsetForWireFrame;
-        public Material material;
         public List<Material> materialList;
         public List<Int64> itemInstances;
 
@@ -97,13 +79,11 @@ namespace IFCViewer
         public VertexBufferArray vertexBufferArray = new VertexBufferArray();
         public VertexBuffer vertexBuffer = new VertexBuffer();
         public IndexBuffer indexBuffer = new IndexBuffer();
+        public Camera camera = Camera.Instance;
 
+        #region 싱글톤
         private static IFCViewerWrapper instance = new IFCViewerWrapper();
-
         private IFCViewerWrapper() { }
-
-
-
         public static IFCViewerWrapper Instance
         {
             get
@@ -111,8 +91,8 @@ namespace IFCViewer
                 return instance;
             }
         }
+        #endregion
 
-        public Camera camera = Camera.Instance;
 
         public bool ParseIfcFile(string sPath)
         {
@@ -539,7 +519,8 @@ namespace IFCViewer
                     Int64 vertexBufferSize = 0, indexBufferSize = 0, transformationBufferSize = 0;
                     IfcEngine.x64.CalculateInstance(item.ifcID, out vertexBufferSize, out indexBufferSize, out transformationBufferSize);
                     material.indexArrayOffset = 0;
-                    material.indexArrayPrimitives = indexBufferSize / 3;
+                    material.indexArrayOffsetSize = IntPtr.Zero;
+                    material.indexArrayCount = indexBufferSize;
                     item.materialList.Add(material);
                 }
 
@@ -549,7 +530,8 @@ namespace IFCViewer
                     Int64 vertexBufferSize = 0, indexBufferSize = 0, transformationBufferSize = 0;
                     IfcEngine.x64.CalculateInstance(item.ifcID, out vertexBufferSize, out indexBufferSize, out transformationBufferSize);
                     item.materialList[0].indexArrayOffset = 0;
-                    item.materialList[0].indexArrayPrimitives = indexBufferSize / 3;
+                    item.materialList[0].indexArrayOffsetSize = IntPtr.Zero;
+                    item.materialList[0].indexArrayCount = indexBufferSize;
                 }
 
                 // 재질이 하나 이상일 경우
@@ -833,12 +815,12 @@ namespace IFCViewer
                     {
                         if (item.materialList[j].active == true)
                         {
-                            offset = item.materialList[j].indexArrayOffset + item.materialList[j].indexArrayPrimitives * 3;
+                            offset = item.materialList[j].indexArrayOffset + item.materialList[j].indexArrayCount;
                             continue;
                         }
                         item.materialList[j].active = true;
                         item.materialList[j].indexArrayOffset = offset;
-                        item.materialList[j].indexArrayPrimitives = indexBufferSize / 3;
+                        item.materialList[j].indexArrayCount = indexBufferSize;
                         break;
 
                     }

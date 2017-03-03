@@ -33,7 +33,7 @@ namespace IFCViewer
         private float height = 0.0f;
         
         // 씬 중심
-        vec3 sceneCenter;
+        private vec3 sceneCenter;
 
         // 조명
         struct LIGHT
@@ -129,6 +129,7 @@ namespace IFCViewer
                     for (var j = 0; j < modelList[i].materialList.Count; ++j)
                     {
                         modelList[i].materialList[j].indexArrayOffset += iBuffSize;
+                        modelList[i].materialList[j].indexArrayOffsetSize = IntPtr.Add(IntPtr.Zero, sizeof(int) * (int)(modelList[i].materialList[j].indexArrayOffset));
                     }
 
                     vBuffSize += modelList[i].noVerticesForFaces;
@@ -141,8 +142,6 @@ namespace IFCViewer
                     {
                         modelList[i].indicesForFaces[j] = modelList[i].indicesForFaces[j] + (int)modelList[i].vertexOffsetForFaces;
                     }
-
-                   
 
                 }
             }
@@ -177,6 +176,31 @@ namespace IFCViewer
             light3.direction = glm.normalize(vecDir3);
             light3.range = 2.0f;
 
+        }
+
+        private void bindingLights(OpenGL gl)
+        {
+            shaderProgram.SetUniform3(gl, "dirLight[0].direction", light1.direction.x, light1.direction.y, light1.direction.z);
+            shaderProgram.SetUniform3(gl, "dirLight[0].diffuse", light1.diffuse.x, light1.diffuse.y, light1.diffuse.z);
+            shaderProgram.SetUniform3(gl, "dirLight[0].ambient", light1.ambient.x, light1.ambient.y, light1.ambient.z);
+            shaderProgram.SetUniform3(gl, "dirLight[0].specular", light1.specular.x, light1.specular.y, light1.specular.z);
+            shaderProgram.SetUniform3(gl, "dirLight[1].direction", light2.direction.x, light2.direction.y, light2.direction.z);
+            shaderProgram.SetUniform3(gl, "dirLight[1].diffuse", light2.diffuse.x, light2.diffuse.y, light2.diffuse.z);
+            shaderProgram.SetUniform3(gl, "dirLight[1].ambient", light2.ambient.x, light2.ambient.y, light2.ambient.z);
+            shaderProgram.SetUniform3(gl, "dirLight[1].specular", light2.specular.x, light2.specular.y, light2.specular.z);
+            shaderProgram.SetUniform3(gl, "dirLight[2].direction", light3.direction.x, light3.direction.y, light3.direction.z);
+            shaderProgram.SetUniform3(gl, "dirLight[2].diffuse", light3.diffuse.x, light3.diffuse.y, light3.diffuse.z);
+            shaderProgram.SetUniform3(gl, "dirLight[2].ambient", light3.ambient.x, light3.ambient.y, light3.ambient.z);
+            shaderProgram.SetUniform3(gl, "dirLight[2].specular", light3.specular.x, light3.specular.y, light3.specular.z);
+        }
+
+        private void bindingMaterials(OpenGL gl, Material material)
+        {
+            shaderProgram.SetUniform3(gl, "material.ambient", material.ambient.x, material.ambient.y, material.ambient.z);
+            shaderProgram.SetUniform3(gl, "material.diffuse", material.diffuse.x, material.diffuse.y, material.diffuse.z);
+            shaderProgram.SetUniform3(gl, "material.specular", material.specular.x, material.specular.y, material.specular.z);
+            shaderProgram.SetUniform3(gl, "material.emissive", material.emissive.x, material.emissive.y, material.emissive.z);
+            shaderProgram.SetUniform1(gl, "material.transparency", material.transparency);
         }
         #endregion
 
@@ -247,7 +271,6 @@ namespace IFCViewer
             sw.Start();
 
         }
-        private uint[] textures = new uint[1];
 
         public void Resize(float w, float h)
         {
@@ -390,7 +413,6 @@ namespace IFCViewer
             matProj = camera.Perspective(rads, width / height, camera.NearDepth, camera.FarDepth);
             #endregion
 
-
             #region 버퍼 생성
             Int64 vBuffSize = 0, iBuffSize = 0;
 
@@ -453,18 +475,17 @@ namespace IFCViewer
             gl.FrontFace(OpenGL.GL_CW);
 
             gl.Enable(OpenGL.GL_DEPTH_TEST);
-            gl.DepthFunc(OpenGL.GL_LESS);
+            gl.DepthFunc(OpenGL.GL_LEQUAL);
 
             //gl.Enable(OpenGL.GL_BLEND);
             //gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
             //gl.Enable(OpenGL.GL_LINE_SMOOTH);
-            
 
             shaderProgram.Bind(gl);
             shaderProgram.SetUniformMatrix4(gl, "matProj", matProj.to_array());
             shaderProgram.SetUniformMatrix4(gl, "matView", matView.to_array());
             bindingLights(gl);
-            
+             
            
             if (modelList.Count != 0)
             {
@@ -473,13 +494,13 @@ namespace IFCViewer
                 // 불투명 객체
                 for (var i = 0; i < modelList.Count; ++i)
                 {
-
                     for (var k = 0; k < modelList[i].materialList.Count; ++k)
                     {
                         if (modelList[i].materialList[k].transparency > 0.9999f)
                         {
                             bindingMaterials(gl, modelList[i].materialList[k]);
-                            gl.DrawElements(OpenGL.GL_TRIANGLES, 3 * (int)modelList[i].materialList[k].indexArrayPrimitives, OpenGL.GL_UNSIGNED_INT, IntPtr.Add(IntPtr.Zero, sizeof(int) * (int)(modelList[i].materialList[k].indexArrayOffset)));
+                            gl.DrawElements(OpenGL.GL_TRIANGLES, (int)modelList[i].materialList[k].indexArrayCount, OpenGL.GL_UNSIGNED_INT, modelList[i].materialList[k].indexArrayOffsetSize);
+
                         }
                     }
                 }
@@ -495,7 +516,7 @@ namespace IFCViewer
                         if (modelList[i].materialList[k].transparency < 0.9999f)
                         {
                             bindingMaterials(gl, modelList[i].materialList[k]);
-                            gl.DrawElements(OpenGL.GL_TRIANGLES, 3 * (int)modelList[i].materialList[k].indexArrayPrimitives, OpenGL.GL_UNSIGNED_INT, IntPtr.Add(IntPtr.Zero, sizeof(int) * (int)(modelList[i].materialList[k].indexArrayOffset)));
+                            gl.DrawElements(OpenGL.GL_TRIANGLES, (int)modelList[i].materialList[k].indexArrayCount, OpenGL.GL_UNSIGNED_INT, modelList[i].materialList[k].indexArrayOffsetSize);
                         }
                     }
                 }
@@ -506,29 +527,21 @@ namespace IFCViewer
             shaderProgram.Unbind(gl);
 
         }
-        private void bindingLights(OpenGL gl)
-        {
-            shaderProgram.SetUniform3(gl, "dirLight[0].direction", light1.direction.x, light1.direction.y, light1.direction.z);
-            shaderProgram.SetUniform3(gl, "dirLight[0].diffuse", light1.diffuse.x, light1.diffuse.y, light1.diffuse.z);
-            shaderProgram.SetUniform3(gl, "dirLight[0].ambient", light1.ambient.x, light1.ambient.y, light1.ambient.z);
-            shaderProgram.SetUniform3(gl, "dirLight[0].specular", light1.specular.x, light1.specular.y, light1.specular.z);
-            shaderProgram.SetUniform3(gl, "dirLight[1].direction", light2.direction.x, light2.direction.y, light2.direction.z);
-            shaderProgram.SetUniform3(gl, "dirLight[1].diffuse", light2.diffuse.x, light2.diffuse.y, light2.diffuse.z);
-            shaderProgram.SetUniform3(gl, "dirLight[1].ambient", light2.ambient.x, light2.ambient.y, light2.ambient.z);
-            shaderProgram.SetUniform3(gl, "dirLight[1].specular", light2.specular.x, light2.specular.y, light2.specular.z);
-            shaderProgram.SetUniform3(gl, "dirLight[2].direction", light3.direction.x, light3.direction.y, light3.direction.z);
-            shaderProgram.SetUniform3(gl, "dirLight[2].diffuse", light3.diffuse.x, light3.diffuse.y, light3.diffuse.z);
-            shaderProgram.SetUniform3(gl, "dirLight[2].ambient", light3.ambient.x, light3.ambient.y, light3.ambient.z);
-            shaderProgram.SetUniform3(gl, "dirLight[2].specular", light3.specular.x, light3.specular.y, light3.specular.z);
-        }
 
-        private void bindingMaterials(OpenGL gl, Material material)
+        void drawFace(OpenGL gl)
         {
-            shaderProgram.SetUniform3(gl, "material.ambient", material.ambient.x, material.ambient.y, material.ambient.z);
-            shaderProgram.SetUniform3(gl, "material.diffuse", material.diffuse.x, material.diffuse.y, material.diffuse.z);
-            shaderProgram.SetUniform3(gl, "material.specular", material.specular.x, material.specular.y, material.specular.z);
-            shaderProgram.SetUniform3(gl, "material.emissive", material.emissive.x, material.emissive.y, material.emissive.z);
-            shaderProgram.SetUniform1(gl, "material.transparency", material.transparency);
+            for (var i = 0; i < modelList.Count; ++i)
+            {
+                for (var k = 0; k < modelList[i].materialList.Count; ++k)
+                {
+                    if (modelList[i].materialList[k].transparency > 0.9999f)
+                    {
+                        bindingMaterials(gl, modelList[i].materialList[k]);
+                        gl.DrawElements(OpenGL.GL_TRIANGLES, (int)modelList[i].materialList[k].indexArrayCount, OpenGL.GL_UNSIGNED_INT, modelList[i].materialList[k].indexArrayOffsetSize);
+
+                    }
+                }
+            }
         }
 
         #endregion

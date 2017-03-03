@@ -14,6 +14,8 @@ namespace WindowsFormsApplication2
     public partial class Form1 : Form
     {
         Scene scene = null;
+        Task sceneTask = null;
+
 
         public Form1()
         {
@@ -27,6 +29,7 @@ namespace WindowsFormsApplication2
             scene.Update();
 
             scene.Render(openGLControl1.OpenGL);
+            //sceneTask = Task.Run(() => scene.Render(openGLControl1.OpenGL));
         }
 
         private void openGLControl1_OpenGLInitialized(object sender, EventArgs e)
@@ -102,5 +105,12 @@ namespace WindowsFormsApplication2
             }
         }
         
+        private void Render()
+        {
+            scene.Update();
+            scene.Render(openGLControl1.OpenGL);
+        }
+        
+
     }
 }
